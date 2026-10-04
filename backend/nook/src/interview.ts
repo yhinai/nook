@@ -101,20 +101,35 @@ export function finishInterview(
   jobs.launch(
     ownerId,
     async (signal) => {
-      const extracted = await reasoner.generate(
+      let extracted = await reasoner.generate(
         'interview',
         { questions: interviewQuestions, answers: interview.answers },
         extractionSchema,
         signal
       )
+      // A model may paraphrase a quote despite the schema being valid. Give it
+      // one correction attempt before any memory is persisted; never accept
+      // a paraphrase as source evidence.
+      if (extracted.memories.some((candidate) => !supportedQuote(candidate))) {
+        extracted = await reasoner.generate(
+          'interview',
+          {
+            questions: interviewQuestions,
+            answers: interview.answers,
+            correction:
+              'The previous extraction used a quote that was not an exact substring of its answer. Copy quotes verbatim, including punctuation, from the matching questionId. Omit unsupported memories.'
+          },
+          extractionSchema,
+          signal
+        )
+      }
       signal.throwIfAborted()
       store.transaction(() => {
         const ids: string[] = []
         const fields = new Set<string>()
         for (const candidate of extracted.memories) {
-          const answer = interview.answers.find((item) => item.questionId === candidate.questionId)
           insist(
-            answer?.answer.includes(candidate.quote),
+            supportedQuote(candidate),
             502,
             'unsupported_memory',
             'The extraction contained an unsupported quote.'
@@ -172,6 +187,11 @@ export function finishInterview(
     }
   )
   return running
+  function supportedQuote(candidate: z.infer<typeof extractedMemory>) {
+    return interview.answers.some(
+      (answer) => answer.questionId === candidate.questionId && answer.answer.includes(candidate.quote)
+    )
+  }
 }
 function candidateFields(candidate: z.infer<typeof extractedMemory>) {
   const {

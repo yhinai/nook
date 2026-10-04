@@ -225,6 +225,40 @@ test('invitation consumption and explicit grants protect private and never-share
   assert.throws(() => memberConnection(store, connection.id, b.user.id), /accept/i)
   store.close()
 })
+test('interview retries unsupported quotes once and never persists invalid evidence', async () => {
+  for (const correctOnRetry of [true, false]) {
+    const { store, a, jobs, reasoner } = fixture()
+    let calls = 0
+    const retrying: Reasoner = {
+      enabled: true,
+      async generate<T>(role: AgentRole, context: unknown, schema: z.ZodType<T>, signal: AbortSignal) {
+        calls++
+        const valid = await reasoner.generate(role, context, schema, signal)
+        if (calls === 1 || !correctOnRetry) {
+          const invalid = JSON.parse(JSON.stringify(valid))
+          invalid.memories[0].quote = 'A paraphrase absent from the answer.'
+          return schema.parse(invalid)
+        }
+        assert.match(JSON.stringify(context), /Copy quotes verbatim/)
+        return valid
+      }
+    }
+    const interview = createInterview(store, a.user.id)
+    answerInterview(store, a.user.id, interview.id, {
+      expectedRevision: interview.revision,
+      questionId: 'values',
+      answer: 'I prioritize time with friends.'
+    })
+    finishInterview(store, jobs, retrying, a.user.id, interview.id)
+    await jobs.settle()
+    assert.equal(calls, 2)
+    const result = store.owned('interview', interview.id, a.user.id, interviewSchema)
+    assert.equal(result.phase, correctOnRetry ? 'ready' : 'failed')
+    assert.equal(profile(store, a.user.id).pending.length, correctOnRetry ? 1 : 0)
+    assert.equal(profile(store, a.user.id).confirmed.length, 0)
+    store.close()
+  }
+})
 test('real workflow contract: extraction stays pending, four council roles and strategist cite confirmed context', async () => {
   const { store, a, jobs, reasoner } = fixture()
   const interview = createInterview(store, a.user.id)

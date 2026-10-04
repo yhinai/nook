@@ -29,7 +29,7 @@ Configure server-only keys in `.dev.vars`, then restart the frontend. `AI_API_KE
 
 Current questions, recent conversation and stated Twin preferences are processed by the configured AI provider. Exa receives a focused public search query rather than the complete profile. Keys and backend bearer tokens remain server-side. Live access requires hosting authentication; loopback development supports a local identity only.
 
-Profiles, conversations, saved messages, local connections and plan states are kept on this device. Saved messages retain their source links and the profile snapshot used when generated. Existing saved council reflections remain readable. Friend Twins are not connected, so their cards show local plan state and an empty state for unavailable Twin updates. No friend is contacted, no calendar is changed, and no booking is made.
+Profiles, conversations, saved messages, local connections and plan states are kept on this device. Saved messages retain their source links and the profile snapshot used when generated. Existing saved council reflections remain readable. Connect Twins by creating and accepting an invitation code. Explicit chat commands such as “invite Maya for dinner” deliver a message to the connected Twin’s backend inbox. Unknown or ambiguous recipients receive nothing. Calendar changes and bookings are not performed.
 
 ## Boundaries
 
@@ -50,4 +50,8 @@ The migrated backend path has been verified with real providers through the loca
 
 ## Backend migration
 
-The frontend registers a separate backend identity per signed-in hosting user and keeps bearer tokens server-side. The adapter caches identities per process; a restart creates a fresh identity rather than syncing an existing backend account. Submitted profiles are request context only: they are not silently confirmed as long-term memories. Existing backend interviews, confirmed-memory review, connections, negotiations, Kernel tasks, and persistent SQLite data retain their API contracts. The UI circle and persona samples remain local previews.
+The frontend registers a separate backend identity per signed-in hosting user and keeps bearer tokens server-side. The adapter caches bearer tokens per process and restores the same backend identity through authenticated session registration after a restart. Submitted profiles are request context only: they are not silently confirmed as long-term memories. Existing backend interviews, confirmed-memory review, connections, negotiations, Kernel tasks, and persistent SQLite data retain their API contracts. The UI circle and persona samples remain local previews.
+
+## Workflow configuration
+
+Run `npm run workflows:status` to check server credential presence without printing secrets. `lib/workflow-config.ts` reads optional Exa, Kernel, Fly and registration credentials. Presence checks do not verify connectivity or perform external actions. Keep local secrets in ignored `.dev.vars`; hosted secrets must be configured separately.

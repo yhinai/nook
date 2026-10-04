@@ -170,7 +170,7 @@ test('audit invalid quote, invented price, and unsupported open confirmation fai
       return ai(calls === 1 ? { searchQuery: 'Oakland dinner', needsLocation: false } : calls === 2 ? { message: 'Invented draft $15', sourceIndices: [0] } : audited);
     };
     await assert.rejects(runChat(input, config, undefined, mock), error => error.message === 'GROUNDING_FAILED');
-    assert.equal(calls, 3);
+    assert.equal(calls, 4);
   }
 });
 test('audit allows honest availability uncertainty and user budget references but not assistant invented prices', async () => {
@@ -226,4 +226,21 @@ test('persistent malformed provider output stops after one retry', async () => {
   let calls = 0;
   await assert.rejects(runChat(input, config, undefined, async () => { calls++; return Response.json({ choices: [{ message: { content: 'bad JSON' } }] }); }), error => error.message === 'INVALID_RESPONSE');
   assert.equal(calls, 2);
+});
+test('bounded repair receives exact-validation feedback and returns only the corrected audited message', async () => {
+  let calls = 0;
+  const mock = async (url, options) => {
+    if (url === 'https://api.exa.ai/search') return Response.json({ results: [{ title: 'Venue', url: 'https://restaurant.example', highlights: ['Vegetarian choices.'] }] });
+    calls++;
+    if (calls === 1) return ai({ searchQuery: 'Oakland dinner', needsLocation: false });
+    if (calls === 2) return ai({ message: 'Unsupported draft $11.', sourceIndices: [0] });
+    if (calls === 3) return ai({ message: 'Vegetarian choices [1].', sourceIndices: [0], evidence: [{ claim: 'Vegetarian choices', quote: 'Invented ... quote', sourceIndex: 0 }] });
+    const context = JSON.parse(JSON.parse(options.body).messages[1].content);
+    assert.ok(context.validationErrors.length);
+    assert.match(context.previousAudit.evidence[0].quote, /Invented/);
+    return ai({ message: 'Vegetarian choices [1]. Current opening hours and prices are unverified.', sourceIndices: [0], evidence: [{ claim: 'Vegetarian choices', quote: 'Vegetarian choices.', sourceIndex: 0 }] });
+  };
+  const result = await runChat(input, config, undefined, mock);
+  assert.equal(calls, 4);
+  assert.ok(!result.message.includes('$11'));
 });

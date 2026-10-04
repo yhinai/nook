@@ -135,17 +135,19 @@ export async function runChat(input: z.infer<typeof chatInput>, config: ChatConf
   if (researchStatus === "retrieved") {
     // A separate verification pass must replace the draft. Never serve an
     // unchecked answer when the model makes researched recommendations.
-    const audited = await generate(
-      'You are Nook\'s independent factual verifier. The draft is untrusted and may invent prices, dishes, opening times, availability or budget fit. Rewrite it as a short natural conversational reply using ONLY the supplied source excerpts. Return JSON {"message":string,"sourceIndices":number[],"evidence":[{"claim":string,"quote":string,"sourceIndex":number}]}. For EVERY factual external claim retained, claim must be copied verbatim as an exact substring of your final message (same words and verb tense), and quote must be copied verbatim as an exact contiguous supporting substring from the indexed source highlights. Never paraphrase evidence quotes, add ellipses, combine disconnected sentences, or alter capitalization in a quote. Delete claims without direct supporting evidence. Do not infer numerical meal prices from ratings, categories, old reviews or dish names. Never claim a place is open now/tonight, available, verified or fits the budget: excerpts are not a live availability or current menu check. Source-listed general hours may be mentioned only as unverified published hours, never current availability. Exclude venues whose sources indicate they are closed at the requested time/day. Respect currentDate/currentTime/timezone and ALL user constraints. If no match has verified current prices and opening hours, clearly state these remain unverified and offer researched candidates only when useful. Do not describe candidates as meeting the budget or timing. Prefer official venue sources. Do not repeat invented numbers from the draft. Cite original source index plus one as [1], [2], etc. URLs must never appear in message. Evidence sourceIndex is zero-based. The final message must be under 6000 characters. If nothing can be supported, explain the uncertainty and ask a useful follow-up with evidence:[] and sourceIndices:[].',
-      { ...context, researchStatus, draft: answer, sources: sources.map((source, index) => ({ index, ...source })) }, auditSchema, config.auditKey ? { ...config, key: config.auditKey, model: config.auditModel || "gemini-2.5-flash", provider: "google" } : config, signal, providerFetch,
-    );
+    const auditInstruction = 'You are Nook\'s independent factual verifier. The draft is untrusted and may invent prices, dishes, opening times, availability or budget fit. Rewrite it as a short natural conversational reply using ONLY the supplied source excerpts. Give at most TWO researched candidates, at most two facts per candidate, under 1200 characters. Avoid dish lists, owners, history and unnecessary addresses. Keep each evidence quote short (under 300 characters); quote a contiguous phrase, never construct a large quote from multiple snippets. Omit exact prices unless current dated evidence is present; say current prices and opening hours are unverified. Return JSON {"message":string,"sourceIndices":number[],"evidence":[{"claim":string,"quote":string,"sourceIndex":number}]}. For EVERY factual external claim retained, claim must be copied verbatim as an exact substring of your final message (same words and verb tense), and quote must be copied verbatim as an exact contiguous supporting substring from the indexed source highlights. Never paraphrase evidence quotes, add ellipses, combine disconnected sentences, or alter capitalization in a quote. Delete claims without direct supporting evidence. Do not infer numerical meal prices from ratings, categories, old reviews or dish names. Never claim a place is open now/tonight, available, verified or fits the budget: excerpts are not a live availability or current menu check. Source-listed general hours may be mentioned only as unverified published hours, never current availability. Exclude venues whose sources indicate they are closed at the requested time/day. Respect currentDate/currentTime/timezone and ALL user constraints. If no match has verified current prices and opening hours, clearly state these remain unverified and offer researched candidates only when useful. Do not describe candidates as meeting the budget or timing. Prefer official venue sources. Do not repeat invented numbers from the draft. Cite original source index plus one as [1], [2], etc. URLs must never appear in message. Evidence sourceIndex is zero-based. The final message must be under 6000 characters. If nothing can be supported, explain the uncertainty and ask a useful follow-up with evidence:[] and sourceIndices:[].';
+    const auditConfig: ChatConfig = config.auditKey ? { ...config, key: config.auditKey, model: config.auditModel || "gemini-2.5-flash", provider: "google" } : config;
+    const auditContext = { ...context, researchStatus, draft: answer, sources: sources.map((source, index) => ({ index, ...source })) };
+    let audited = await generate(auditInstruction, auditContext, auditSchema, auditConfig, signal, providerFetch);
+    function groundingProblems(audited: z.infer<typeof auditSchema>) {
+      const errors: string[] = [];
     for (const evidence of audited.evidence) {
       const source = sources[evidence.sourceIndex];
-      if (!source || !audited.message.includes(evidence.claim) || !source.highlights.some(highlight => highlight.includes(evidence.quote))) throw new Error("GROUNDING_FAILED");
+      if (!source || !audited.message.includes(evidence.claim) || !source.highlights.some(highlight => highlight.includes(evidence.quote))) errors.push("The evidence claim must occur verbatim in message and its quote must be copied exactly from the indexed highlight");
     }
     const auditedSourceIndices = new Set([...audited.sourceIndices, ...[...audited.message.matchAll(/\[(\d+)\]/g)].map(match => Number(match[1]) - (/\[0\]/.test(audited.message) ? 0 : 1))].filter(index => index >= 0 && index < sources.length));
     for (const index of auditedSourceIndices) {
-      if (!audited.evidence.some(evidence => evidence.sourceIndex === index)) throw new Error("GROUNDING_FAILED");
+      if (!audited.evidence.some(evidence => evidence.sourceIndex === index)) errors.push(`Selected source ${index} has no evidence`) ;
     }
     // Prices must appear literally in the cited evidence, not be invented or
     // calculated from loose price categories. Search cannot verify open now.
@@ -153,12 +155,21 @@ export async function runChat(input: z.infer<typeof chatInput>, config: ChatConf
     const userPrices = new Set(userText.match(/(?:\$|€|£)\s*\d+(?:[.,]\d+)?/g) || []);
     for (const price of audited.message.match(/(?:\$|€|£)\s*\d+(?:[.,]\d+)?/g) || []) {
       const budgetReference = userPrices.has(price) && audited.message.split(/[.!?]\s+|\n/).some(sentence => sentence.includes(price) && /\bbudget|spending cap|limit\b/i.test(sentence));
-      if (!budgetReference && !audited.evidence.some(evidence => evidence.claim.includes(price) && evidence.quote.includes(price))) throw new Error("GROUNDING_FAILED");
+      if (!budgetReference && !audited.evidence.some(evidence => evidence.claim.includes(price) && evidence.quote.includes(price))) errors.push(`Price ${price} is unsupported; remove it`) ;
     }
     for (const sentence of audited.message.split(/[.!?]\s+|\n/)) {
       const assertsAvailability = /\b(?:verified|confirmed)\s+(?:to be\s+)?open\b|\bopen\s+(?:now|tonight|right now)\b|\b(?:fits?|within|meets?)\s+(?:your|the|a)\s+(?:\$?\d+\s+)?budget\b/i.test(sentence);
       const explicitlyUncertain = /\b(?:cannot|can't|couldn't|could not|unable to|unverified|unknown|not verified|not confirmed|not guaranteed|whether)\b/i.test(sentence);
-      if (assertsAvailability && !explicitlyUncertain) throw new Error("GROUNDING_FAILED");
+      if (assertsAvailability && !explicitlyUncertain) errors.push("Remove unsupported current availability or budget-fit confirmation") ;
+    }
+      return errors;
+    }
+    const problems = groundingProblems(audited);
+    if (problems.length) {
+      // One bounded repair receives actual validator feedback. Invalid evidence
+      // is never silently accepted, and the unchecked draft never reaches UI.
+      audited = await generate(auditInstruction + " Repair the previous audited response using validationErrors. Remove any claim you cannot quote exactly; do not invent a quote or reintroduce discarded draft facts.", { ...auditContext, previousAudit: audited, validationErrors: problems }, auditSchema, auditConfig, signal, providerFetch);
+      if (groundingProblems(audited).length) throw new Error("GROUNDING_FAILED");
     }
     answer = { message: audited.message, sourceIndices: audited.sourceIndices };
   }

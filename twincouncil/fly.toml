@@ -1,0 +1,40 @@
+# App names are global on Fly: pick your own, then `fly apps create <name>`.
+app = "twincouncil-change-me"
+primary_region = "sjc"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  MASTRA_HOST = "0.0.0.0"
+  PORT = "4111"
+  TWIN_OUTPUT_DIR = "/data"
+  # The app exits after this many idle minutes, which stops the Machine (scale to zero).
+  TWIN_IDLE_EXIT_MIN = "10"
+
+[http_service]
+  internal_port = 4111
+  force_https = true
+  # Off on purpose: Fly's auto-stop would stop the Machine in the middle of a scout, because a run
+  # continues after the HTTP request that started it has returned. The app stops itself instead.
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    grace_period = "20s"
+    interval = "30s"
+    method = "GET"
+    timeout = "5s"
+    path = "/health"
+
+# Keeps events.md across Machine restarts.
+[[mounts]]
+  source = "twin_data"
+  destination = "/data"
+  initial_size = "1gb"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"

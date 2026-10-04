@@ -1,0 +1,20 @@
+{
+  "name": "nook",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "backend/nook"
+  ],
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "build": "npm --prefix backend/nook run build",
+    "start": "npm --prefix backend/nook run start",
+    "dev": "npm --prefix backend/nook run dev",
+    "typecheck": "npm --prefix backend/nook run typecheck",
+    "test": "npm --prefix backend/nook run test",
+    "demo": "npm --prefix backend/nook run demo",
+    "verify:live": "npm --prefix backend/nook run verify:live"
+  }
+}

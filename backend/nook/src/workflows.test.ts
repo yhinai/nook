@@ -97,6 +97,12 @@ function fixture() {
           risks: [],
           unknowns: []
         }
+        assert.throws(() =>
+          schema.parse({
+            ...value as Record<string, unknown>,
+            role: role === 'career' ? 'finance' : 'career'
+          })
+        )
       }
       return schema.parse(value)
     }

@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import {
   councilRoles,
   decisionInput,
@@ -116,7 +117,7 @@ export function startDecision(
               instruction:
                 'Assess every supplied option exactly once. Genuine disagreement is useful; do not manufacture facts or force opposition. Only confirmed supplied memories describe the person.'
             },
-            opinionSchema,
+            opinionSchema.extend({ role: z.literal(role) }),
             signal
           )
           insist(

@@ -231,8 +231,8 @@ test('invitation consumption and explicit grants protect private and never-share
   assert.throws(() => memberConnection(store, connection.id, b.user.id), /accept/i)
   store.close()
 })
-test('interview retries unsupported quotes once and never persists invalid evidence', async () => {
-  for (const correctOnRetry of [true, false]) {
+test('interview retries unsupported quotes and duplicate fields once without persisting invalid evidence', async () => {
+  for (const [problem, correctOnRetry] of [['quote', true], ['quote', false], ['duplicate', true], ['duplicate', false]] as const) {
     const { store, a, jobs, reasoner } = fixture()
     let calls = 0
     const retrying: Reasoner = {
@@ -242,7 +242,8 @@ test('interview retries unsupported quotes once and never persists invalid evide
         const valid = await reasoner.generate(role, context, schema, signal)
         if (calls === 1 || !correctOnRetry) {
           const invalid = JSON.parse(JSON.stringify(valid))
-          invalid.memories[0].quote = 'A paraphrase absent from the answer.'
+          if (problem === 'quote') invalid.memories[0].quote = 'A paraphrase absent from the answer.'
+          else invalid.memories.push({ ...invalid.memories[0] })
           return schema.parse(invalid)
         }
         assert.match(JSON.stringify(context), /Copy quotes verbatim/)

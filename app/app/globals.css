@@ -312,3 +312,50 @@ button.lens-icon { width: 44px; height: 44px; }
 .onboarding-error { color: #9d4738; font-size: 14px; margin-top: 18px; }
 .onboarding-loading { height: 100dvh; display: grid; place-items: center; color: var(--muted); }
 @media (max-width: 600px) { .onboarding-shell { padding: 22px 16px max(32px, env(safe-area-inset-bottom)); } .onboarding-brand { margin-bottom: 22px; } .onboarding-card { padding: 26px 22px; border-radius: 22px; } .onboarding-card h1 { font-size: 27px; } .onboarding-actions { flex-wrap: wrap; } .onboarding-top .eyebrow { font-size: 10px; } }
+
+/* Team workspace: purpose, people, and a clear next action. */
+.team-overview { display: flex; align-items: flex-start; gap: 14px; margin: 4px 0 24px; }
+.team-overview > .lens-icon { width: 50px; height: 50px; border-radius: 16px; }
+.team-overview > div { min-width: 0; }
+.team-overview p { font-size: 16px; color: #4c5c54; }
+.team-mode { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; margin-top: 8px; }
+.team-mode > span { width: 6px; height: 6px; border-radius: 50%; background: #809b8c; }
+.team-goal { padding: 20px; background: #edf3ef; border: 1px solid #e0e9e3; border-radius: 18px; }
+.team-goal > p { font-size: 19px; line-height: 1.5; letter-spacing: -.3px; margin-top: 9px; overflow-wrap: anywhere; }
+.team-goal .twin-values { margin-bottom: 0; }
+.team-goal .twin-values span { background: #ffffffa6; }
+.team-section { margin-top: 26px; }
+.team-section h3 { font-size: 15px; font-weight: 600; }
+.team-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 13px; }
+.team-section-heading > span { font-size: 12px; color: var(--muted); }
+.team-member-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+.team-member-options > button { min-width: 0; padding: 16px 9px; border: 1px solid var(--line); border-radius: 16px; background: #fff; display: flex; flex-direction: column; align-items: center; gap: 9px; text-align: center; }
+.team-member-options > button:hover { background: #f1f5f2; }
+.team-member-options > button[aria-pressed="true"] { background: #edf4ef; border-color: #86a797; box-shadow: inset 0 0 0 1px #86a797; }
+.team-member-options .avatar { width: 44px; height: 44px; }
+.team-member-options .avatar.sand { color: #8b7144; background: #f1e9d9; }
+.team-member-options .avatar.rose { color: #a57470; background: #f2e2e0; }
+.team-member-options strong { font-size: 14px; }
+.team-member-options small { font-size: 12px; line-height: 1.5; color: var(--muted); }
+.team-member-note { margin-top: 12px; padding: 16px 18px; background: #f2f5f3; border-radius: 14px; }
+.team-member-note p { font-size: 14px; margin-top: 7px; }
+.team-member-note .text-button { margin-top: 5px; padding-left: 0; }
+.team-focus-options { display: flex; flex-wrap: wrap; gap: 8px; }
+.team-focus-options > button { display: inline-flex; align-items: center; gap: 9px; min-height: 44px; text-align: left; font-size: 13px; padding: 10px 13px; border: 1px solid var(--line); background: white; border-radius: 12px; }
+.team-focus-options > button:hover { background: #edf3ef; border-color: #a6bcae; }
+.team-next-steps ol { list-style: none; counter-reset: step; padding: 0; display: grid; gap: 12px; margin: 16px 0 0; }
+.team-next-steps li { counter-increment: step; display: flex; align-items: center; gap: 11px; font-size: 14px; line-height: 1.5; }
+.team-next-steps li::before { content: counter(step); width: 26px; height: 26px; border-radius: 50%; background: #edf1ef; color: #597065; display: grid; place-items: center; font-size: 12px; flex-shrink: 0; }
+.team-conversation { border-top: 1px solid var(--line); margin-top: 26px; padding-top: 4px; }
+.team-message-input { display: flex; align-items: flex-end; gap: 8px; border: 1px solid #dce2e3; border-radius: 16px; padding: 7px; background: white; }
+.team-message-input:focus-within { border-color: #7c9c91; box-shadow: 0 0 0 3px #95b5a826; }
+.team-message-input textarea { min-width: 0; min-height: 64px; border: 0; background: transparent; padding: 7px; resize: vertical; }
+.team-message-input textarea:focus { outline: none; }
+.team-message-input .send-button { background: var(--green); color: white; border-radius: 12px; }
+.team-reply { margin-bottom: 14px; }
+.team-reply .text-button { flex-wrap: wrap; text-align: left; justify-content: flex-start; margin-top: 10px; }
+@media (max-width: 380px) {
+  .team-member-options { gap: 6px; }
+  .team-member-options > button { padding: 13px 5px; }
+  .team-section-heading { flex-wrap: wrap; }
+}

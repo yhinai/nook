@@ -16,6 +16,7 @@ import {
 } from './memory.js'
 import { createInterview, answerInterview, finishInterview, answerSchema } from './interview.js'
 import { startDecision } from './decisions.js'
+import { reflectionInput, startReflection } from './reflections.js'
 import { invite, accept, grant, revoke, memberConnection, connectionView } from './connections.js'
 import {
   createNegotiation,
@@ -77,6 +78,8 @@ export function createRoutes(services: Services): Route[] {
       false
     ),
     route('GET', '/profile', ({ ownerId }) => profile(store, ownerId)),
+    route('POST', '/reflections', ({ ownerId, body }) =>
+      startReflection(jobs, reasoner, research, ownerId, body), reflectionInput),
     route('GET', '/memories', ({ ownerId }) =>
       store.list('memory', contracts.memorySchema, ownerId)
     ),

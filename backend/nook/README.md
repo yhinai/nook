@@ -61,3 +61,7 @@ This uses the repository root as build context; Fly resolves the configured Dock
 The Fly container reads `NOOK_DATABASE=/data/nook.db`, listens on port 8080, and checks `/v1/health`. Autostop is off so background jobs can finish. Provider calls, browser usage, and hosting consume available account credits. A 48-hour deployment token expires independently of the running app.
 
 Official integration references: [Mastra structured output](https://mastra.ai/docs/agents/structured-output), [Kernel](https://www.kernel.sh/docs/browsers), [Exa](https://exa.ai/docs/reference/search), [Fly configuration](https://docs.fly.io/reference/configuration/).
+
+## Frontend council adapter
+
+`POST /v1/reflections` accepts an authenticated, bounded question, recent user/assistant history, and an explicitly supplied current profile. Mastra runs health, career, and relationships perspectives, a finance critic, and strategist synthesis; Exa provides general public decision research. Profiles remain request context and are not automatically confirmed as long-term memory. The response retains the frontend’s three-opinion `mode: live` contract. Existing structured decisions, interviews, connections, negotiation approvals, and Kernel routes are unchanged.

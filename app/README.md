@@ -25,9 +25,9 @@ On opening, users who have not completed onboarding are asked for their name, pr
 
 The local preview works without credentials. Questions, profile preferences, decisions, and per-friend plan states are saved in this browser. The preview offers illustrative perspectives; arbitrary questions use reflection prompts rather than invented personal details. Saved recommendations keep the profile snapshot used to generate them. Invalid saved data is preserved rather than overwritten.
 
-The council API implements three independent specialist model calls in parallel, followed by an independent critic and a Twin synthesis. It validates inputs and outputs, cancels unfinished requests, keeps credentials server-side, and requires sign-in and a request budget for live calls.
+With NOOK_API_URL and NOOK_REGISTRATION_KEY configured server-side, the council API uses the migrated Nook backend: Mastra runs independent health/career/relationship perspectives, a practical finance critic, and strategist synthesis; Exa supplies public research. Existing OpenAI-only configuration remains supported. It validates inputs and outputs, cancels unfinished requests, keeps credentials server-side, and requires sign-in and a request budget for live calls.
 
-To enable live council locally, copy `.env.example` to `.dev.vars`, provide your own `OPENAI_API_KEY`, and restart the server. `OPENAI_MODEL` selects the model. Use the local sign-in link exposed under Privacy & live AI, then explicitly enable live council. Live processing sends the current question, recent conversation when supplied, and stated Twin profile to OpenAI. Local storage does not imply local model processing.
+To enable live council locally, copy `.env.example` to `.dev.vars`, configure `NOOK_API_URL` and the backend’s `NOOK_REGISTRATION_KEY`, and restart the server. Never use NEXT_PUBLIC_ for a credential. `OPENAI_MODEL` selects the model. Use the local sign-in link exposed under Privacy & live AI, then explicitly enable live council. Live processing sends the current question, recent conversation when supplied, and stated Twin profile to the configured AI service through the server. Local storage does not imply local model processing.
 
 Friend representatives and their negotiations are sample experiences. Adding a connection creates a local placeholder. Saving a plan records interest locally; no friend is contacted, no calendar is changed, and no booking is made. Individual team-persona chats also remain labeled samples.
 
@@ -35,7 +35,7 @@ Friend representatives and their negotiations are sample experiences. Adding a c
 
 This is a personal-use first version. Data does not sync across devices. The request budget is per-process (10 consultations/hour and one at a time per authenticated user); replace it with a durable budget before multi-instance use. Authentication relies on the trusted hosting sign-in headers; do not expose a raw Worker behind an untrusted proxy that permits callers to inject those headers. The local preview simulates sign-in on loopback only.
 
-Live-provider execution has not been verified with a real API key. Orchestration is covered by mocked-provider tests, and local API validation/unconfigured behavior has been checked.
+The migrated backend path has been verified with real providers through the local frontend: onboarding, loopback sign-in, explicit live-mode opt-in, council reasoning, and a synthetic question. Backend and frontend regression tests also cover validation, authentication, cancellation, identity isolation, and saved-state migration.
 
 ## Source
 
@@ -45,3 +45,7 @@ Live-provider execution has not been verified with a real API key. Orchestration
 - `lib/council-agent.ts`: specialist → critic → Twin orchestration.
 - `lib/workspace.ts`: saved-state and result validation.
 - `tests/`: orchestration, cancellation, persisted-state, and budget regressions.
+
+## Backend migration
+
+The frontend registers a separate backend identity per signed-in hosting user and keeps bearer tokens server-side. The adapter caches identities per process; a restart creates a fresh identity rather than syncing an existing backend account. Submitted profiles are request context only: they are not silently confirmed as long-term memories. Existing backend interviews, confirmed-memory review, connections, negotiations, Kernel tasks, and persistent SQLite data retain their API contracts. The UI circle and persona samples remain local previews.

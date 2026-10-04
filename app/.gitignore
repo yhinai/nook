@@ -48,3 +48,7 @@ next-env.d.ts
 # Keep the non-secret configuration example in source
 !.env.example
 *.tsbuildinfo
+
+# Local Cloudflare secrets
+.dev.vars
+.dev.vars.*

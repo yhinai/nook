@@ -41,7 +41,7 @@ function fail(message: string): never {
 
 if (values.help || !command) {
   console.log(USAGE)
-  process.exit(command ? 0 : 1)
+  process.exit(values.help ? 0 : 1)
 }
 if (['ask', 'negotiate', 'scout'].includes(command) && !process.env.ANTHROPIC_API_KEY) {
   fail('ANTHROPIC_API_KEY is not set. Copy .env.example to .env and fill it in.')
@@ -81,5 +81,11 @@ try {
   exitCode = 1
 }
 
-await exa.disconnect()
+try {
+  await exa.disconnect()
+} catch {
+  // a failed disconnect must not turn a finished command into a failure
+}
+// stdout is asynchronous when it is a pipe: let it drain, or process.exit would cut a long answer short
+await new Promise(resolve => process.stdout.write('', resolve))
 process.exit(exitCode)

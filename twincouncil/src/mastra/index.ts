@@ -19,20 +19,30 @@ import { negotiate } from './workflows/negotiate.ts'
 let lastActivity = Date.now()
 let inFlight = 0
 
+/** Counts an accepted request as work in flight until it is answered, so the idle timer cannot exit under it. */
+async function tracked(next: () => Promise<void>): Promise<void> {
+  inFlight++
+  try {
+    await next()
+  } finally {
+    inFlight--
+    lastActivity = Date.now()
+  }
+}
+
 /** Bearer-token gate. Fails closed in production if no token is configured. */
 const requireToken = async (c: { req: { header: (name: string) => string | undefined } }, next: () => Promise<void>) => {
   const expected = process.env.TWIN_API_TOKEN
   if (!expected) {
     if (process.env.NODE_ENV === 'production') return new Response('TWIN_API_TOKEN is not set', { status: 503 })
-    return next()
+    return tracked(next)
   }
   const given = Buffer.from(c.req.header('Authorization')?.replace(/^Bearer\s+/i, '') ?? '')
   const wanted = Buffer.from(expected)
   if (given.length !== wanted.length || !timingSafeEqual(given, wanted)) {
     return new Response('Unauthorized', { status: 401 })
   }
-  lastActivity = Date.now()
-  return next()
+  return tracked(next)
 }
 
 /** Progress lines, then the result, as NDJSON. Bytes keep flowing, so no proxy times the request out. */
@@ -139,15 +149,17 @@ export const mastra = new Mastra({
         method: 'POST',
         middleware: [requireToken],
         handler: async c => {
-          if (current.state === 'running') {
-            return c.json({ error: 'a scout is already running', startedAt: current.startedAt }, 409)
-          }
-          const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>
+          const body = ((await c.req.json().catch(() => null)) ?? {}) as Record<string, unknown>
           let plan = profile.itinerary
           if (body.city !== undefined) {
             const stay = StayInput.safeParse(body)
             if (!stay.success) return c.json({ error: 'invalid stay', issues: stay.error.issues }, 400)
             plan = [stay.data]
+          }
+          // Checked after the last await: runPlan marks itself running before it first awaits, so two
+          // requests cannot both pass.
+          if (current.state === 'running') {
+            return c.json({ error: 'a scout is already running', startedAt: current.startedAt }, 409)
           }
           // Runs in the background; the machine stays up until it finishes (see the idle timer below).
           void runPlan(plan)

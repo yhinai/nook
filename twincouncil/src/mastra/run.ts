@@ -57,7 +57,7 @@ export async function runPlan(plan: StayInput[]): Promise<ScoutState[]> {
         throw new Error(outcome.status === 'failed' ? outcome.error.message : `workflow ended as "${outcome.status}"`)
       }
       results.push(outcome.result)
-      current.files.push(...outcome.result.files)
+      current.files.push(...outcome.result.files.filter(file => !current.files.includes(file)))
     }
     // Several stays: events.md holds all of them, one section per city.
     if (results.length > 1) {

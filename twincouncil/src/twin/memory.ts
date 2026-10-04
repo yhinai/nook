@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { z } from 'zod'
 import { profile, today } from './profile.ts'
@@ -57,17 +57,44 @@ function fileFor(id: string): string {
 }
 
 export async function recall(id: string): Promise<PersonMemory> {
-  const saved = await readFile(fileFor(id), 'utf8').catch(() => null)
-  if (saved !== null) return PersonMemory.parse(JSON.parse(saved))
-  return structuredClone(SEEDS[id] ?? { id, name: id, facts: [] })
+  // Only a missing file means "nothing saved yet": after any other read error, falling back to the
+  // seed would let the next remember() save the seed over the real file.
+  const saved = await readFile(fileFor(id), 'utf8').catch((err: NodeJS.ErrnoException) => {
+    if (err.code === 'ENOENT') return null
+    throw err
+  })
+  if (saved !== null) {
+    try {
+      return PersonMemory.parse(JSON.parse(saved))
+    } catch (err) {
+      throw new Error(`memory file ${id}.json is not valid: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+  // Own keys only: "constructor" and "__proto__" are valid ids and would find Object.prototype.
+  return structuredClone((Object.hasOwn(SEEDS, id) ? SEEDS[id] : undefined) ?? { id, name: id, facts: [] })
 }
 
+// remember() reads, appends and writes back, so calls run one at a time: two that overlapped would
+// read the same file, and the later write would drop the earlier fact.
+let writes: Promise<unknown> = Promise.resolve()
+
 export async function remember(id: string, text: string, kind: MemoryFact['kind'] = 'preference'): Promise<PersonMemory> {
-  const memory = await recall(id)
-  memory.facts.push({ kind, text: text.trim(), updatedAt: today() })
-  await mkdir(memoryDir(), { recursive: true })
-  await writeFile(fileFor(id), `${JSON.stringify(memory, null, 2)}\n`)
-  return memory
+  const file = fileFor(id)
+  const fact = text.trim()
+  // An empty fact would be saved and then fail MemoryFact on every later recall.
+  if (!fact) throw new Error('nothing to remember: the text is empty')
+  const turn = writes.then(async () => {
+    const memory = await recall(id)
+    memory.facts.push({ kind, text: fact, updatedAt: today() })
+    await mkdir(memoryDir(), { recursive: true })
+    // Written beside the file, then renamed into place: a concurrent recall never reads half a file.
+    const temp = `${file}.${process.pid}.tmp`
+    await writeFile(temp, `${JSON.stringify(memory, null, 2)}\n`)
+    await rename(temp, file)
+    return memory
+  })
+  writes = turn.catch(() => undefined)
+  return turn
 }
 
 export function memoryBrief(memory: PersonMemory): string {

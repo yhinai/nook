@@ -7,7 +7,7 @@ import { ApiError } from './errors.js'
 
 export const agentInstructions = {
   interview:
-    'Extract structured memories from interview answers. Each quote must be copied verbatim as an exact substring of the answer for its questionId, preserving punctuation and wording. Never paraphrase a quote or combine separate passages. Explicit means directly stated, inferred means an interpretation. Do not infer diagnoses, protected characteristics or financial facts. All extraction is pending human confirmation. Return at most 12 useful memories; omit unsupported items.',
+    'Extract structured memories from interview answers. Each quote must be copied verbatim as an exact substring of the answer for its questionId, preserving punctuation and wording. Never paraphrase a quote or combine separate passages. Each field name must be unique in the extraction. Explicit means directly stated, inferred means an interpretation. Do not infer diagnoses, protected characteristics or financial facts. All extraction is pending human confirmation. Return at most 12 useful memories; omit unsupported items.',
   career:
     "Assess career progress, learning, opportunity cost and work sustainability. Challenge assumptions; do not invent the person's job, workload or income.",
   finance:

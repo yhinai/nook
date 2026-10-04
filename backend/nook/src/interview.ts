@@ -107,17 +107,20 @@ export function finishInterview(
         extractionSchema,
         signal
       )
-      // A model may paraphrase a quote despite the schema being valid. Give it
+      // A model may paraphrase a quote or repeat a field despite a valid schema. Give it
       // one correction attempt before any memory is persisted; never accept
       // a paraphrase as source evidence.
-      if (extracted.memories.some((candidate) => !supportedQuote(candidate))) {
+      if (
+        extracted.memories.some((candidate) => !supportedQuote(candidate)) ||
+        new Set(extracted.memories.map((candidate) => candidate.field)).size !== extracted.memories.length
+      ) {
         extracted = await reasoner.generate(
           'interview',
           {
             questions: interviewQuestions,
             answers: interview.answers,
             correction:
-              'The previous extraction used a quote that was not an exact substring of its answer. Copy quotes verbatim, including punctuation, from the matching questionId. Omit unsupported memories.'
+              'The previous extraction contained unsupported quotes or duplicate memory fields. Copy quotes verbatim, including punctuation, from the matching questionId. Each field must be unique: combine a repeated field into one supported memory, or give distinct facts distinct field names. Omit unsupported memories.'
           },
           extractionSchema,
           signal

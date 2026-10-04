@@ -15,6 +15,11 @@
     "typecheck": "npm --prefix backend/nook run typecheck",
     "test": "npm --prefix backend/nook run test",
     "demo": "npm --prefix backend/nook run demo",
-    "verify:live": "npm --prefix backend/nook run verify:live"
+    "verify:live": "npm --prefix backend/nook run verify:live",
+    "frontend:install": "npm --prefix app ci",
+    "frontend:dev": "npm --prefix app run dev -- --host 127.0.0.1",
+    "frontend:build": "npm --prefix app run build",
+    "frontend:typecheck": "npm --prefix app run typecheck",
+    "frontend:test": "npm --prefix app test"
   }
 }

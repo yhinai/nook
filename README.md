@@ -19,3 +19,17 @@ Configure `backend/nook/.env` using `.env.example` before running real agents. C
 See [backend instructions](backend/nook/README.md) for API workflows, the demo, and Fly.io deployment.
 
 The small shared provider and research modules under `src/` are reused from [Orca](https://github.com/stablyai/orca); their MIT license and copyright notice are retained in `LICENSE`.
+
+## Personal council frontend
+
+The Nook web frontend is in `app/`. It includes first-open onboarding, editable personal details and optional social profile links, a conversation workspace, and local saved reflections.
+
+```sh
+npm run frontend:install
+npm run frontend:dev
+npm run frontend:typecheck
+npm run frontend:test
+npm run frontend:build
+```
+
+See [frontend instructions](app/README.md) for live council configuration and current functionality. The frontend currently uses its own council API; integration with the Mastra backend remains separate.

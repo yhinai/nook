@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { randomUUID } from 'node:crypto'
 import type { Store } from './store.js'
 import { fresh } from './store.js'
-import { memoryInput, memorySchema, twinSchema, userSchema, type Memory } from './contracts.js'
+import { base, memoryInput, memorySchema, twinSchema, userSchema, type Memory } from './contracts.js'
 import { insist } from './errors.js'
 
 export function isCurrent(memory: Memory, now = Date.now()): boolean {
@@ -24,6 +24,22 @@ export function register(store: Store, input: unknown) {
     return { user, twin, token: store.issueToken(ownerId) }
   })
 }
+const sessionSchema = base.extend({ externalId: z.string().regex(/^[a-f0-9]{64}$/) }).strict()
+export const sessionInput = z.object({ displayName: z.string().trim().min(1).max(100), externalId: z.string().regex(/^[a-f0-9]{64}$/) }).strict()
+// Accessible only with the server registration key. External IDs are derived
+// from hosting-authenticated IDs; display names never authenticate a user.
+export function registerSession(store: Store, input: unknown) {
+  const request = sessionInput.parse(input)
+  const session = store.list('session', sessionSchema).find(item => item.externalId === request.externalId)
+  if (session) {
+    const user = store.owned('user', session.ownerId, session.ownerId, userSchema)
+    return { user, token: store.issueToken(user.id) }
+  }
+  const registered = register(store, { displayName: request.displayName })
+  store.insert('session', { ...fresh(registered.user.id), externalId: request.externalId }, sessionSchema)
+  return registered
+}
+
 export function touchTwin(store: Store, ownerId: string) {
   const twin = store.owned('twin', ownerId, ownerId, twinSchema)
   return store.update('twin', twin, twinSchema)

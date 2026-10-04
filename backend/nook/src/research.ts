@@ -17,56 +17,64 @@ const queries = {
 }
 export type Research = {
   enabled: boolean
+  searchQuery?(
+    query: string,
+    signal: AbortSignal
+  ): Promise<{ status: Decision['researchStatus']; sources: Decision['sources'] }>
   search(
     category: Decision['category'],
     signal: AbortSignal
   ): Promise<{ status: Decision['researchStatus']; sources: Decision['sources'] }>
 }
 export function createExaResearch(provider: SidequestProvider): Research {
+  async function searchQuery(query: string, signal: AbortSignal, wellbeing = false): Promise<{ status: Decision['researchStatus']; sources: Decision['sources'] }> {
+    if (!provider.exaKey) {
+      return { status: 'off', sources: [] }
+    }
+    try {
+      const results = await withinDeadline(
+        async (requestSignal) => {
+          const response = await fetch('https://api.exa.ai/search', {
+            method: 'POST',
+            signal: requestSignal,
+            headers: { 'Content-Type': 'application/json', 'x-api-key': provider.exaKey || '' },
+            body: JSON.stringify({
+              query,
+              numResults: 3,
+              type: 'auto',
+              contents: { highlights: true, maxAgeHours: 24, livecrawlTimeout: 10000 },
+              ...(wellbeing ? { includeDomains: healthDomains } : {})
+            })
+          })
+          if (!response.ok) {
+            throw new Error('Search unavailable.')
+          }
+          return researchResponseSchema.parse(await response.json())
+        },
+        signal,
+        20000
+      )
+      const sources = (results.results || [])
+        .filter((source) => permittedSource(source.url, wellbeing) && !/^https:\/\/(?:www\.)?exa\.ai\/library\//i.test(source.url))
+        .slice(0, 3)
+        .map((source) => ({
+          title: (source.title || 'Public source').slice(0, 300),
+          url: source.url,
+          highlights: (source.highlights || [])
+            .slice(0, 2)
+            .map((highlight) => highlight.slice(0, 1200))
+        }))
+      return { status: sources.length ? 'retrieved' : 'unavailable', sources }
+    } catch {
+      signal.throwIfAborted()
+      return { status: 'unavailable', sources: [] }
+    }
+  }
   return {
     enabled: Boolean(provider.exaKey),
-    async search(category, signal) {
-      if (!provider.exaKey) {
-        return { status: 'off', sources: [] }
-      }
-      try {
-        const results = await withinDeadline(
-          async (requestSignal) => {
-            const response = await fetch('https://api.exa.ai/search', {
-              method: 'POST',
-              signal: requestSignal,
-              headers: { 'Content-Type': 'application/json', 'x-api-key': provider.exaKey || '' },
-              body: JSON.stringify({
-                query: queries[category],
-                numResults: 3,
-                type: 'auto',
-                contents: { highlights: true },
-                ...(category === 'wellbeing' ? { includeDomains: healthDomains } : {})
-              })
-            })
-            if (!response.ok) {
-              throw new Error('Search unavailable.')
-            }
-            return researchResponseSchema.parse(await response.json())
-          },
-          signal,
-          20000
-        )
-        const sources = (results.results || [])
-          .filter((source) => permittedSource(source.url, category === 'wellbeing'))
-          .slice(0, 3)
-          .map((source) => ({
-            title: (source.title || 'Public source').slice(0, 300),
-            url: source.url,
-            highlights: (source.highlights || [])
-              .slice(0, 2)
-              .map((highlight) => highlight.slice(0, 1200))
-          }))
-        return { status: sources.length ? 'retrieved' : 'unavailable', sources }
-      } catch {
-        signal.throwIfAborted()
-        return { status: 'unavailable', sources: [] }
-      }
+    searchQuery,
+    search(category, signal) {
+      return searchQuery(queries[category], signal, category === 'wellbeing')
     }
   }
 }

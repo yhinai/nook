@@ -121,7 +121,8 @@ export function createHttpServer(config: Config, services: Services) {
         )
         ownerId = services.store.authenticate(authorization.slice(7))
       }
-      if (route.path === '/users' && config.registrationKey) {
+      if (route.path === '/users/session') insist(config.registrationKey, 503, 'registration_closed', 'Session registration requires a configured registration key.')
+      if (route.path.startsWith('/users') && config.registrationKey) {
         const supplied = request.headers['x-nook-registration-key']
         insist(
           typeof supplied === 'string' &&

@@ -64,6 +64,7 @@ test('HTTP authentication, registration gate, owner isolation, CORS, JSON limits
         ...(body === undefined ? {} : { body: JSON.stringify(body) })
       })
     assert.equal((await request('/v1/profile')).status, 401)
+    assert.equal((await request('/v1/chat', {})).status, 401)
     assert.equal((await request('/v1/users', { displayName: 'A' })).status, 403)
     const register = async (name: string) =>
       registration.parse(
@@ -74,6 +75,10 @@ test('HTTP authentication, registration gate, owner isolation, CORS, JSON limits
         ).json()
       )
     const a = await register('Alex')
+    assert.equal((await request('/v1/chat', {
+      question: 'Find dinner',
+      profile: { name: 'Alex', priority: 'Friends', values: ['Friends'], weekend: true }
+    }, a.token)).status, 503)
     const b = await register('Blair')
     const memory = z.object({ id: z.string(), revision: z.number() }).parse(
       await (

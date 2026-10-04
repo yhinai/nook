@@ -1,6 +1,5 @@
 import { env } from "cloudflare:workers";
 import { getChatGPTUser } from "@/app/chatgpt-auth";
-import { acquireCouncilBudget } from "@/lib/request-budget";
 import { councilInput, runCouncil } from "@/lib/council-agent";
 import { runBackendCouncil } from "@/lib/nook-backend";
 
@@ -24,8 +23,6 @@ export async function POST(request: Request) {
   if (!available(settings)) return Response.json({ error: "Live AI is not configured. Configure the Nook backend connection on the server or use the local preview.", code: "NOT_CONFIGURED" }, { status: 503, headers });
   const user = await getChatGPTUser();
   if (!user) return Response.json({ error: "Please sign in before using the live council." }, { status: 401, headers });
-  const release = acquireCouncilBudget(user.userId);
-  if (!release) return Response.json({ error: "Your council is busy or your hourly request budget is reached. Please try later." }, { status: 429, headers });
   const controller = new AbortController();
   const abort = () => controller.abort();
   if (request.signal.aborted) controller.abort();
@@ -35,5 +32,5 @@ export async function POST(request: Request) {
   catch (error) {
     const rateLimit = error instanceof Error && error.message === "RATE_LIMIT";
     return Response.json({ error: controller.signal.aborted ? "The council took too long. Please try again." : rateLimit ? "The AI service is busy. Please try again shortly." : "The council could not complete this reflection. Please try again or use preview mode." }, { status: rateLimit ? 429 : 502, headers });
-  } finally { clearTimeout(timeout); controller.abort(); request.signal.removeEventListener("abort", abort); release(); }
+  } finally { clearTimeout(timeout); controller.abort(); request.signal.removeEventListener("abort", abort); }
 }

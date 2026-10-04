@@ -7,6 +7,8 @@ import type { Research } from './research.js'
 import { browserInput, browserSchema, startBrowserRead, type PublicBrowser } from './browser.js'
 import {
   register,
+  registerSession,
+  sessionInput,
   profile,
   createMemory,
   reviewMemory,
@@ -17,6 +19,8 @@ import {
 import { createInterview, answerInterview, finishInterview, answerSchema } from './interview.js'
 import { startDecision } from './decisions.js'
 import { reflectionInput, startReflection } from './reflections.js'
+import { chatInput, startChat } from './chat.js'
+import { agentMessageSchema, sendAgentMessage } from './agent-messages.js'
 import { invite, accept, grant, revoke, memberConnection, connectionView } from './connections.js'
 import {
   createNegotiation,
@@ -77,7 +81,10 @@ export function createRoutes(services: Services): Route[] {
       201,
       false
     ),
+    route('POST', '/users/session', ({ body }) => registerSession(store, body), sessionInput, 200, false),
     route('GET', '/profile', ({ ownerId }) => profile(store, ownerId)),
+    route('POST', '/chat', ({ ownerId, body }) =>
+      sendAgentMessage(store, ownerId, chatInput.parse(body).question) ?? startChat(jobs, reasoner, research, ownerId, body), chatInput),
     route('POST', '/reflections', ({ ownerId, body }) =>
       startReflection(jobs, reasoner, research, ownerId, body), reflectionInput),
     route('GET', '/memories', ({ ownerId }) =>
@@ -147,6 +154,9 @@ export function createRoutes(services: Services): Route[] {
       '/decisions/{id}/events',
       ({ ownerId, resourceId }) =>
         store.owned('decision', resourceId, ownerId, contracts.decisionSchema).events
+    ),
+    route('GET', '/agent/messages', ({ ownerId }) =>
+      store.list('agent_message', agentMessageSchema, ownerId)
     ),
     route('GET', '/connections', ({ ownerId }) =>
       store
@@ -244,7 +254,7 @@ export function openApi(routes: Route[]) {
       operationId: route.method.toLowerCase() + route.path.replace(/\W/g, '_'),
       security: route.auth
         ? [{ bearerAuth: [] }]
-        : route.path === '/users'
+        : route.path.startsWith('/users')
           ? [{ registrationKey: [] }]
           : [],
       ...(route.path.includes('{id}')

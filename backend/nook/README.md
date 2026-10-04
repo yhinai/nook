@@ -43,7 +43,7 @@ The OpenAPI document defines exact request bodies and endpoints. JSON bodies are
 
 - Mastra uses `AI_API_KEY`, `AI_BASE_URL`, and `AI_MODEL`. Exa uses `EXA_API_KEY`; Kernel uses `KERNEL_API_KEY`.
 - Kernel runs in a fresh headless session, without profiles, saved logins, arbitrary agent code, or form interactions. Requests are limited to GET documents on the chosen allowlisted host. URLs with credentials, query parameters, or fragments are rejected. Configure trusted public hosts through `NOOK_BROWSER_DOMAINS`; defaults cover GitHub, Mastra, Kernel, Exa, Wikipedia, Fly docs, CDC, and WHO.
-- Exa receives fixed category queries rather than the person's private interview text. Sources are untrusted context. Agent memory references and recommendation option IDs are checked.
+- Structured decisions use category queries. Conversational chat asks the configured AI to form focused public search queries from the user's request and explicit constraints in recent history. Exa receives those queries, such as cuisine and city for a dinner request. Sources are untrusted context; replies may cite only retrieved source URLs. Agent memory references and recommendation option IDs are checked.
 - Memory confidence describes provenance, not a calibrated prediction. Health and finance are ordinary decision perspectives, not diagnosis or investment advice.
 - SQLite persists users, token hashes, memory provenance, revision checks, jobs, progress, and approval state. Running work is marked interrupted after restart, with completed results preserved. Expired memory is excluded from retrieval.
 - Four jobs run concurrently globally, with one per initiating user and a two-minute job limit. Poll persisted resources for progress. The deployment uses one instance and one volume; do not add replicas against independent SQLite volumes.
@@ -65,3 +65,18 @@ Official integration references: [Mastra structured output](https://mastra.ai/do
 ## Frontend council adapter
 
 `POST /v1/reflections` accepts an authenticated, bounded question, recent user/assistant history, and an explicitly supplied current profile. Mastra runs health, career, and relationships perspectives, a finance critic, and strategist synthesis; Exa provides general public decision research. Profiles remain request context and are not automatically confirmed as long-term memory. The response retains the frontend’s three-opinion `mode: live` contract. Existing structured decisions, interviews, connections, negotiation approvals, and Kernel routes are unchanged.
+
+## Conversational chat
+
+`POST /v1/chat` uses the same bearer authentication and profile shape as reflections. It accepts a `question` (up to 1,000 characters), optional recent `history` (up to six user/assistant messages, 2,000 characters each), `profile` with `name`, `priority`, `values`, `weekend`, and optional `about`, and an optional IANA `timezone` such as `America/Los_Angeles`. Relative dates use that timezone; omitted timezone defaults to UTC.
+
+```json
+{
+  "question": "Find dinner for tonight",
+  "timezone": "America/Los_Angeles",
+  "history": [{ "role": "user", "content": "I am in Oakland and want vegetarian food under $30." }],
+  "profile": { "name": "Alex", "priority": "Connection", "values": ["Friends"], "weekend": true }
+}
+```
+
+The configured AI plans a focused Exa search when current public information is needed, then replies in conversational prose with retrieved source links. A local request without a location gets a short question before searching. Ordinary conversation and reflection do not require a search. The synchronous response is `{ "message": "...", "sources": [], "researchStatus": "off|retrieved|unavailable", "mode": "live" }`; `sources` contains titles, URLs, and excerpts when available. A missing AI key returns `503 model_unconfigured`. Missing or failed Exa research is reported without sample restaurants or fabricated recommendations. Sources do not establish live reservations, pricing, or opening hours unless the excerpts support those facts. Chat performs no bookings or other external actions, and supplied profile/history remains request context rather than confirmed memory.

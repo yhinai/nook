@@ -23,13 +23,13 @@ npm run build
 
 On opening, users who have not completed onboarding are asked for their name, priority, and values, with optional background, LinkedIn, Instagram, and website links. Completion and profile details are saved in this browser; details can be edited under You. Links are stored without importing social account data. Background answers are included in live council context when the user enables live AI.
 
-The local preview works without credentials. Questions, profile preferences, decisions, and per-friend plan states are saved in this browser. The preview offers illustrative perspectives; arbitrary questions use reflection prompts rather than invented personal details. Saved recommendations keep the profile snapshot used to generate them. Invalid saved data is preserved rather than overwritten.
+Chat is conversational: Nook asks for missing details, uses the recent conversation to understand follow-ups, and searches public sources with Exa when current information is needed. “Find dinner” should lead to a question about location and preferences; a follow-up with those details can produce researched options with source links. It does not invent restaurant hours, reservations, prices, or actions taken.
 
-With NOOK_API_URL and NOOK_REGISTRATION_KEY configured server-side, the council API uses the migrated Nook backend: Mastra runs independent health/career/relationship perspectives, a practical finance critic, and strategist synthesis; Exa supplies public research. Existing OpenAI-only configuration remains supported. It validates inputs and outputs, cancels unfinished requests, keeps credentials server-side, and requires sign-in and a request budget for live calls.
+Configure server-only keys in `.dev.vars`, then restart the frontend. `AI_API_KEY`, `AI_BASE_URL`, and `AI_MODEL` select an OpenAI-compatible provider; `OPENROUTER_API_KEY`, `OPENAI_API_KEY` or `GOOGLE_API_KEY` are supported alternatives. Add `EXA_API_KEY` for public research. Alternatively, set `NOOK_API_URL` and `NOOK_REGISTRATION_KEY` to a backend with `/v1/chat` support. Without AI credentials, chat explains the missing connection instead of producing canned responses. When research is unavailable, that state is visible. Researched replies pass through a separate AI evidence review; quoted support and source links are validated before display. Current prices and availability remain unverified unless separately confirmed.
 
-To enable live council locally, copy `.env.example` to `.dev.vars`, configure `NOOK_API_URL` and the backend’s `NOOK_REGISTRATION_KEY`, and restart the server. Never use NEXT_PUBLIC_ for a credential. `OPENAI_MODEL` selects the model. Use the local sign-in link exposed under Privacy & live AI, then explicitly enable live council. Live processing sends the current question, recent conversation when supplied, and stated Twin profile to the configured AI service through the server. Local storage does not imply local model processing.
+Current questions, recent conversation and stated Twin preferences are processed by the configured AI provider. Exa receives a focused public search query rather than the complete profile. Keys and backend bearer tokens remain server-side. Live access requires hosting authentication; loopback development supports a local identity only.
 
-Friend representatives and their negotiations are sample experiences. Adding a connection creates a local placeholder. Saving a plan records interest locally; no friend is contacted, no calendar is changed, and no booking is made. Individual team-persona chats also remain labeled samples.
+Profiles, conversations, saved messages, local connections and plan states are kept on this device. Saved messages retain their source links and the profile snapshot used when generated. Existing saved council reflections remain readable. Friend Twins are not connected, so their cards show local plan state and an empty state for unavailable Twin updates. No friend is contacted, no calendar is changed, and no booking is made.
 
 ## Boundaries
 
@@ -41,7 +41,9 @@ The migrated backend path has been verified with real providers through the loca
 
 - `app/page.tsx`: conversation workspace, Twin preferences, council/circle sheets, mobile navigation.
 - `app/globals.css`: responsive light theme and accessible interaction states.
-- `app/api/council/route.ts`: live council boundary, authentication, request budget, cancellation.
+- `app/api/chat/route.ts`: conversational AI boundary, authentication, request budget, cancellation.
+- `lib/chat-agent.ts`: provider-backed conversation planning, Exa research and grounded replies.
+- `app/api/council/route.ts`: specialist council API for explicit council use.
 - `lib/council-agent.ts`: specialist → critic → Twin orchestration.
 - `lib/workspace.ts`: saved-state and result validation.
 - `tests/`: orchestration, cancellation, persisted-state, and budget regressions.

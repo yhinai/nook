@@ -7,6 +7,7 @@ import { insist } from './errors.js'
 import { reflectionInput } from './reflections.js'
 
 export const chatInput = reflectionInput.extend({
+  location: z.object({ latitude: z.number().finite().min(-90).max(90), longitude: z.number().finite().min(-180).max(180), capturedAt: z.string().datetime() }).strict().optional(),
   requestId: z.string().uuid().optional(),
   perspective: z.enum(["wellbeing", "work", "relationships"]).optional(),
   timezone: z.string().trim().min(1).max(100).refine(value => {
@@ -24,11 +25,15 @@ const auditSchema = answerSchema.extend({ evidence: z.array(z.object({ claim: z.
 
 export async function runChat(reasoner: Reasoner, research: Research, input: unknown, signal: AbortSignal) {
   const request = chatInput.parse(input)
+  if (request.location) {
+    const age = Date.now() - Date.parse(request.location.capturedAt)
+    if (age < 0 || age >= 15 * 60 * 1000) delete request.location
+  }
   // The starter prompt has no location. Resolve this essential constraint
   // before invoking a model or public search; neither may invent the city.
   const genericDinnerRequest = /^(?:find (?:me )?(?:somewhere|a (?:place|restaurant)) (?:for|to (?:have|eat)) dinner(?: tonight)?|find somewhere for dinner tonight)[.!?]*$/i.test(request.question)
   const suppliedContext = [request.profile.about, ...(request.history || []).filter(turn => turn.role === 'user').map(turn => turn.content)].filter(Boolean)
-  if (genericDinnerRequest && suppliedContext.length === 0) {
+  if (genericDinnerRequest && !request.location && suppliedContext.length === 0) {
     signal.throwIfAborted()
     return { message: 'What city or neighborhood should I look in for dinner tonight?', mode: 'live' as const, sources: [], researchStatus: 'off' as const }
   }
@@ -46,10 +51,10 @@ export async function runChat(reasoner: Reasoner, research: Research, input: unk
   const plan = await reasoner.generate('chat', {
     ...request,
     ...timeContext,
-    instruction: 'Plan a conversational reply. For requests needing current public information (restaurants, events, travel, factual research), produce a focused searchQuery using the actual user request and explicit constraints from history. Include the explicitly supplied city/neighborhood, food preferences or timing where relevant. For local recommendations without an explicit location, ask one concise clarification and set searchQuery to null. Ask for other essential missing constraints only when they prevent a useful answer; do not turn this into an intake form. For ordinary conversation, reflection or emotional support, set both fields to null. Never use generic decision-framework search templates. Do not infer personal facts or use assistant suggestions as confirmed user preferences. Return searchQuery and clarification, each string or null.'
+    instruction: 'Plan a conversational reply. For requests needing current public information (restaurants, events, travel, factual research), produce a focused searchQuery using the actual user request and explicit constraints from history. Include the explicitly supplied city/neighborhood, food preferences or timing where relevant. For local recommendations, consented approximate coordinates in location are a usable search location. Use them in a nearby search when no explicit destination is supplied, without inventing a city name from coordinates. An explicitly requested city or neighborhood always takes precedence over device coordinates. For local recommendations without coordinates or an explicit location, ask one concise clarification and set searchQuery to null. Ask for other essential missing constraints only when they prevent a useful answer; do not turn this into an intake form. For ordinary conversation, reflection or emotional support, set both fields to null. Never use generic decision-framework search templates. Do not infer personal facts or use assistant suggestions as confirmed user preferences. Return searchQuery and clarification, each string or null.'
   }, planSchema, signal)
   const userLocationContext = [request.question, ...suppliedContext].join('\n')
-  if (genericDinnerRequest && (!plan.locationQuote || !userLocationContext.includes(plan.locationQuote))) {
+  if (genericDinnerRequest && !request.location && (!plan.locationQuote || !userLocationContext.includes(plan.locationQuote))) {
     signal.throwIfAborted()
     return { message: 'What city or neighborhood should I look in for dinner tonight?', mode: 'live' as const, sources: [], researchStatus: 'off' as const }
   }

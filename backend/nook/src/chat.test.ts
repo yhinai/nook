@@ -167,3 +167,31 @@ test('unrelated profile details do not permit a guessed dinner location', async 
   assert.match(result.message, /city or neighborhood/)
   assert.equal(calls, 1)
 })
+
+test('consented device location enables starter research and is forwarded to the agent', async () => {
+  const location = { latitude: 37.8, longitude: -122.27, capturedAt: new Date().toISOString() }
+  let calls = 0
+  let searched = false
+  const reasoner: Reasoner = { enabled: true, async generate(_role, context, schema) {
+    const data = context as { location: unknown; instruction: string }
+    assert.deepEqual(data.location, location)
+    if (calls++ === 0) {
+      assert.match(data.instruction, /explicitly requested city or neighborhood always takes precedence/i)
+      return schema.parse({ locationQuote: null, searchQuery: 'dinner near 37.8 -122.27', clarification: null })
+    }
+    return schema.parse({ message: 'I could not retrieve nearby results. What kind of food sounds good?' })
+  } }
+  const research: Research = { enabled: true, async search() { throw new Error('Unexpected static search') }, async searchQuery(query) {
+    searched = true; assert.equal(query, 'dinner near 37.8 -122.27'); return { status: 'unavailable', sources: [] }
+  } }
+  const result = await runChat(reasoner, research, { ...input, question: 'Find somewhere for dinner tonight.', history: [], location }, new AbortController().signal)
+  assert.equal(searched, true)
+  assert.equal(calls, 2)
+  assert.equal(result.researchStatus, 'unavailable')
+})
+test('expired device location still requires the dinner starter to ask for a city', async () => {
+  const reasoner: Reasoner = { enabled: true, async generate() { throw new Error('Unexpected model call') } }
+  const research: Research = { enabled: true, async search() { throw new Error('Unexpected research') } }
+  const result = await runChat(reasoner, research, { ...input, question: 'Find somewhere for dinner tonight.', history: [], location: { latitude: 37.8, longitude: -122.27, capturedAt: '2020-01-01T00:00:00.000Z' } }, new AbortController().signal)
+  assert.match(result.message, /city or neighborhood/)
+})

@@ -489,3 +489,17 @@ button.lens-icon { width: 44px; height: 44px; }
 .twins-main > .system-twins { margin-bottom: 24px; }
 .twins-main > .system-twins .twin-directory-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); }
 .system-twins .twin-card-action:disabled { opacity: 1; color: #52675b; }
+
+.location-permission { display: flex; align-items: flex-start; gap: 12px; margin: 18px 24px 0; padding: 17px 18px; border: 1px solid #dce7df; border-radius: 17px; background: #f0f6f2; color: #426859; flex-shrink: 0; }
+.location-permission > svg { flex-shrink: 0; margin-top: 2px; }
+.location-permission > div { flex: 1; min-width: 0; }
+.location-permission h3 { font-size: 14px; }
+.location-permission p { margin-top: 6px; font-size: 12px; line-height: 1.65; color: #5b6f63; }
+.location-actions { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+.location-actions .secondary-button { margin: 0; font-size: 13px; }
+.location-actions .text-button { font-size: 12px; min-height: 40px; }
+.location-permission .location-error { color: #925947; }
+.location-settings { margin: 24px 0; }
+.location-dismiss { flex-shrink: 0; }
+.composer-meta { flex-wrap: wrap; gap: 8px; }
+@media (max-width: 600px) { .location-permission { margin: 12px 14px 0; padding: 14px; }.location-settings { margin: 20px 0; } }

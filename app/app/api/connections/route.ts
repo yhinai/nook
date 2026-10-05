@@ -5,7 +5,11 @@ import { chatConfig, chatInput, localChatIdentity } from "@/lib/chat-agent";
 import { runBackendConnections } from "@/lib/nook-backend";
 import { chatFailure } from "@/lib/chat-errors";
 
-const inputSchema = z.object({ profile: chatInput.shape.profile, action: z.enum(["list", "invite", "accept", "inbox"]), invitationToken: z.string().regex(/^[A-Za-z0-9_-]{43}$/).optional() }).strict();
+const inputSchema = z.discriminatedUnion("action", [
+  z.object({ profile: chatInput.shape.profile, action: z.enum(["list", "invite", "inbox"]) }).strict(),
+  z.object({ profile: chatInput.shape.profile, action: z.literal("accept"), invitationToken: z.string().regex(/^[A-Za-z0-9_-]{43}$/) }).strict(),
+  z.object({ profile: chatInput.shape.profile, action: z.literal("send"), connectionId: z.string().uuid(), content: z.string().trim().min(1).max(1000), requestId: z.string().uuid() }).strict(),
+]);
 const headers = { "Cache-Control": "no-store" };
 export async function POST(request: Request) {
   const origin = request.headers.get("origin");
@@ -15,7 +19,6 @@ export async function POST(request: Request) {
     const raw = await request.text();
     if (raw.length > 10000) throw new Error("Too large");
     input = inputSchema.parse(JSON.parse(raw));
-    if (input.action === "accept" && !input.invitationToken) throw new Error("Missing token");
   } catch { return Response.json({ error: "Provide a valid profile and connection request." }, { status: 400, headers }); }
   const settings = chatConfig(env as unknown as Record<string, unknown>);
   if (!settings.url || !settings.registrationKey) return Response.json({ error: "Connect the Nook agent backend to use Twin connections." }, { status: 503, headers });
@@ -27,7 +30,7 @@ export async function POST(request: Request) {
   request.signal.addEventListener("abort", abort, { once: true });
   const timeout = setTimeout(abort, 15000);
   try {
-    return Response.json(await runBackendConnections({ question: "Manage Twin connections", profile: input.profile }, userId, settings, controller.signal, input.action, input.invitationToken), { headers });
+    return Response.json(await runBackendConnections({ question: "Manage Twin connections", profile: input.profile }, userId, settings, controller.signal, input.action, input.action === "accept" ? input.invitationToken : input.action === "send" ? { connectionId: input.connectionId, content: input.content, requestId: input.requestId } : undefined), { headers });
   } catch (error) {
     const failure = chatFailure(error, controller.signal.aborted);
     return Response.json({ error: failure.error, code: failure.code }, { status: failure.status, headers });

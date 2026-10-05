@@ -48,3 +48,22 @@ test('chat adapter uses migrated backend chat endpoint, shares identity and vali
   await runBackendChat(input, 'bridge-chat', settings, new AbortController().signal, mock);
   assert.equal(registrations, 1);
 });
+test('adapter refreshes rejected tokens once while keeping backend identity stable', async () => {
+  let registrations = 0;
+  let calls = 0;
+  const identities = [];
+  const mock = async (url, options) => {
+    if (url.pathname === '/v1/users/session') { registrations++; identities.push(JSON.parse(options.body).externalId); return Response.json({ token: `refreshed-${registrations}` }); }
+    calls++;
+    return calls === 1 ? Response.json({ error: { code: 'unauthorized' } }, { status: 401 }) : Response.json(result);
+  };
+  await runBackendCouncil(input, 'expired-token-user', settings, new AbortController().signal, mock);
+  assert.equal(registrations, 2);
+  assert.equal(calls, 2);
+  assert.equal(identities[0], identities[1]);
+});
+test('adapter surfaces invitation errors by safe code, never upstream private messages', async () => {
+  const { runBackendConnections } = await import('../lib/nook-backend.ts');
+  const mock = async url => url.pathname === '/v1/users/session' ? Response.json({ token: 'identity' }) : Response.json({ error: { code: 'invitation_invalid', message: 'private upstream data' } }, { status: 404 });
+  await assert.rejects(runBackendConnections(input, 'expired-invitation-user', settings, new AbortController().signal, 'accept', 'x'.repeat(43), mock), error => error.message === 'INVITATION_INVALID');
+});

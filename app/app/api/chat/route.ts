@@ -10,7 +10,9 @@ const hasBackend = (settings: ReturnType<typeof config>) => Boolean(settings.url
 const available = (settings: ReturnType<typeof config>) => Boolean(settings.key || hasBackend(settings));
 async function identity(request: Request) { return (await getChatGPTUser())?.userId || localChatIdentity(request, process.env.NODE_ENV !== "production" || config().allowLocalChat); }
 export async function GET(request: Request) {
-  const settings = config();
+  let settings;
+  try { settings = config(); if (settings.baseUrl) new URL(settings.baseUrl); }
+  catch { return Response.json({ available: false, agentsAvailable: false, requiresSignIn: false, configurationError: true }, { headers }); }
   const configured = available(settings);
   const userId = configured ? await identity(request) : null;
   return Response.json({ available: configured && Boolean(userId), requiresSignIn: configured && !userId, agentsAvailable: hasBackend(settings) && Boolean(userId), provider: hasBackend(settings) ? "nook" : settings.key ? settings.provider === "google" ? "google" : settings.baseUrl && new URL(settings.baseUrl).hostname !== "api.openai.com" ? "compatible" : "openai" : null, researchAvailable: Boolean(settings.exaKey) }, { headers });

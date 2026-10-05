@@ -15,5 +15,10 @@ export const workspaceSchema = z.object({ profile: profileSchema, onboardingComp
 
 export type Profile = z.infer<typeof profileSchema>;
 
-export const connectionViewSchema = z.object({ id: z.string().uuid(), phase: z.enum(["invited", "active", "revoked"]), participants: z.array(z.object({ id: z.string().uuid(), displayName: z.string() })), invitationToken: z.string().optional() });
+export const connectionViewSchema = z.object({ id: z.string().uuid(), phase: z.enum(["invited", "active", "revoked"]), participants: z.array(z.object({ id: z.string().uuid(), displayName: z.string(), isMe: z.boolean().default(false) })), invitationToken: z.string().optional() });
 export type TwinConnection = z.infer<typeof connectionViewSchema>;
+
+export const agentInboxSchema = z.array(z.object({ id: z.string().uuid(), senderId: z.string().uuid(), senderName: z.string(), connectionId: z.string().uuid(), content: z.string().min(1).max(1000), kind: z.enum(["invitation", "message"]), createdAt: z.string() }));
+export type AgentMessage = z.infer<typeof agentInboxSchema>[number];
+
+export const deliveryReceiptSchema = z.object({ id: z.string().uuid(), status: z.literal("delivered") });

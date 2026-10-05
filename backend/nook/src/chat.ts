@@ -7,6 +7,8 @@ import { insist } from './errors.js'
 import { reflectionInput } from './reflections.js'
 
 export const chatInput = reflectionInput.extend({
+  requestId: z.string().uuid().optional(),
+  perspective: z.enum(["wellbeing", "work", "relationships"]).optional(),
   timezone: z.string().trim().min(1).max(100).refine(value => {
     try { new Intl.DateTimeFormat('en-US', { timeZone: value }); return true }
     catch { return false }
@@ -48,7 +50,7 @@ export async function runChat(reasoner: Reasoner, research: Research, input: unk
       ...request, sources: found.sources, researchStatus: found.status,
       searched: Boolean(plan.searchQuery),
       ...timeContext,
-      instruction: 'Answer the latest request in natural conversational prose, keeping continuity with user-provided history. Offer a useful next step, with a short question only if it helps. Use supplied profile as preferences for this request, never confirmed memory. Interpret tonight and relative dates using currentDate/currentTime in the supplied timezone. Never recommend named places or assert current external facts unless supported by supplied sources, even if no search was planned. Respect explicit user constraints strictly: do not suggest a restaurant for tonight if retrieved hours say it is closed on that local date. Do not assert a restaurant fits a budget such as $30 without recent menu/price evidence. Qualify stale source dates, estimates, and unverified hours or prices; if essential constraints cannot be verified, say so. If research was requested but returned no sources, explicitly say live results could not be retrieved and do not provide invented recommendations. For retrieved results, recommend only places or facts supported by the supplied excerpts, link the source alongside each factual recommendation, and do not imply snippets establish current opening hours, prices or availability. If snippets are not relevant or sufficient, explain what could not be verified and ask for a narrower search. Do not use canned council opinions or output a decision report. Return message.'
+      instruction: 'If perspective is supplied, focus on that lens: wellbeing means energy and sustainable habits; work means career and practical tradeoffs; relationships means communication and connection. Answer the latest request in natural conversational prose, keeping continuity with user-provided history. Offer a useful next step, with a short question only if it helps. Use supplied profile as preferences for this request, never confirmed memory. Interpret tonight and relative dates using currentDate/currentTime in the supplied timezone. Never recommend named places or assert current external facts unless supported by supplied sources, even if no search was planned. Respect explicit user constraints strictly: do not suggest a restaurant for tonight if retrieved hours say it is closed on that local date. Do not assert a restaurant fits a budget such as $30 without recent menu/price evidence. Qualify stale source dates, estimates, and unverified hours or prices; if essential constraints cannot be verified, say so. If research was requested but returned no sources, explicitly say live results could not be retrieved and do not provide invented recommendations. For retrieved results, recommend only places or facts supported by the supplied excerpts, link the source alongside each factual recommendation, and do not imply snippets establish current opening hours, prices or availability. If snippets are not relevant or sufficient, explain what could not be verified and ask for a narrower search. Do not use canned council opinions or output a decision report. Return message.'
     }, answerSchema, signal)
   if (found.status === 'retrieved') {
     const audited = await reasoner.generate('chat', {
@@ -70,13 +72,13 @@ export async function runChat(reasoner: Reasoner, research: Research, input: unk
   return { ...answer, mode: 'live' as const, sources: found.sources, researchStatus: found.status }
 }
 
-export function startChat(jobs: Jobs, reasoner: Reasoner, research: Research, ownerId: string, input: unknown) {
+export function startChat(jobs: Jobs, reasoner: Reasoner, research: Research, ownerId: string, input: unknown, requestSignal?: AbortSignal) {
   const request = chatInput.parse(input)
   insist(reasoner.enabled, 503, 'model_unconfigured', 'Configure an AI provider before chatting with Nook.')
   jobs.requireAvailable(ownerId)
   return new Promise<Awaited<ReturnType<typeof runChat>>>((resolve, reject) => {
     jobs.launch(ownerId, async signal => {
-      try { resolve(await runChat(reasoner, research, request, signal)) }
+      try { resolve(await runChat(reasoner, research, request, requestSignal ? AbortSignal.any([signal, requestSignal]) : signal)) }
       catch (error) { reject(error); throw error }
     }, () => {})
   })

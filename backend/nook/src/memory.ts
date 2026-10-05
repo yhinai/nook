@@ -32,8 +32,15 @@ export function registerSession(store: Store, input: unknown) {
   const request = sessionInput.parse(input)
   const session = store.list('session', sessionSchema).find(item => item.externalId === request.externalId)
   if (session) {
-    const user = store.owned('user', session.ownerId, session.ownerId, userSchema)
-    return { user, token: store.issueToken(user.id) }
+    return store.transaction(() => {
+      let user = store.owned('user', session.ownerId, session.ownerId, userSchema)
+      if (user.displayName !== request.displayName) {
+        user = store.update('user', { ...user, displayName: request.displayName }, userSchema)
+        const twin = store.owned('twin', user.id, user.id, twinSchema)
+        store.update('twin', { ...twin, label: `${request.displayName}'s AI Twin` }, twinSchema)
+      }
+      return { user, token: store.issueToken(user.id) }
+    })
   }
   const registered = register(store, { displayName: request.displayName })
   store.insert('session', { ...fresh(registered.user.id), externalId: request.externalId }, sessionSchema)

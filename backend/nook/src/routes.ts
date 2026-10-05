@@ -20,7 +20,7 @@ import { createInterview, answerInterview, finishInterview, answerSchema } from 
 import { startDecision } from './decisions.js'
 import { reflectionInput, startReflection } from './reflections.js'
 import { chatInput, startChat } from './chat.js'
-import { agentMessageSchema, sendAgentMessage } from './agent-messages.js'
+import { inbox, deliverMessage, messageInput, sendAgentMessage } from './agent-messages.js'
 import { invite, accept, grant, revoke, memberConnection, connectionView } from './connections.js'
 import {
   createNegotiation,
@@ -38,7 +38,7 @@ export type Services = {
   browser: PublicBrowser
   browserDomains: string[]
 }
-type Context = { ownerId: string; resourceId: string; body: unknown }
+type Context = { ownerId: string; resourceId: string; body: unknown; signal?: AbortSignal }
 export type Route = {
   method: string
   path: string
@@ -83,8 +83,8 @@ export function createRoutes(services: Services): Route[] {
     ),
     route('POST', '/users/session', ({ body }) => registerSession(store, body), sessionInput, 200, false),
     route('GET', '/profile', ({ ownerId }) => profile(store, ownerId)),
-    route('POST', '/chat', ({ ownerId, body }) =>
-      sendAgentMessage(store, ownerId, chatInput.parse(body).question) ?? startChat(jobs, reasoner, research, ownerId, body), chatInput),
+    route('POST', '/chat', ({ ownerId, body, signal }) =>
+      sendAgentMessage(store, ownerId, chatInput.parse(body).question, chatInput.parse(body).requestId) ?? startChat(jobs, reasoner, research, ownerId, body, signal), chatInput),
     route('POST', '/reflections', ({ ownerId, body }) =>
       startReflection(jobs, reasoner, research, ownerId, body), reflectionInput),
     route('GET', '/memories', ({ ownerId }) =>
@@ -156,8 +156,9 @@ export function createRoutes(services: Services): Route[] {
         store.owned('decision', resourceId, ownerId, contracts.decisionSchema).events
     ),
     route('GET', '/agent/messages', ({ ownerId }) =>
-      store.list('agent_message', agentMessageSchema, ownerId)
+      inbox(store, ownerId)
     ),
+    route('POST', '/agent/messages', ({ ownerId, body }) => deliverMessage(store, ownerId, body), messageInput, 201),
     route('GET', '/connections', ({ ownerId }) =>
       store
         .list('connection', contracts.connectionSchema)

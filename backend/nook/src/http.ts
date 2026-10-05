@@ -50,6 +50,10 @@ export function createHttpServer(config: Config, services: Services) {
   server.headersTimeout = 15000
   server.keepAliveTimeout = 5000
   async function handle(request: IncomingMessage, response: ServerResponse) {
+    const controller = new AbortController()
+    const cancel = () => { if (!response.writableEnded) controller.abort() }
+    request.once('aborted', cancel)
+    response.once('close', cancel)
     const requestId = randomUUID()
     response.setHeader('Content-Type', 'application/json; charset=utf-8')
     response.setHeader('Cache-Control', 'no-store')
@@ -141,7 +145,7 @@ export function createHttpServer(config: Config, services: Services) {
       if (route.schema) {
         route.schema.parse(body)
       }
-      const value = await route.action({ ownerId, resourceId, body })
+      const value = await route.action({ ownerId, resourceId, body, signal: controller.signal })
       send(route.status, value)
     } catch (error) {
       const status =

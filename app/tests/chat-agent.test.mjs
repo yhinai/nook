@@ -244,3 +244,21 @@ test('bounded repair receives exact-validation feedback and returns only the cor
   assert.equal(calls, 4);
   assert.ok(!result.message.includes('$11'));
 });
+test('exhausted primary provider falls back to configured Google once and leaves caller configuration unchanged', async () => {
+  const settings = { ...config, auditKey: 'google-fallback', auditModel: 'gemini-2.5-flash' };
+  let primary = 0;
+  let google = 0;
+  const mock = async (url, options) => {
+    if (!url.includes('generativelanguage')) { primary++; return Response.json({ error: { code: 402 } }, { status: 402 }); }
+    google++;
+    assert.equal(options.headers['x-goog-api-key'], 'google-fallback');
+    return Response.json({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: JSON.stringify(google === 1 ? { searchQuery: null, needsLocation: false } : { message: 'What would help you make time?', sourceIndices: [] }) }] } }] });
+  };
+  assert.match((await runChat({ ...input, question: 'Help me make time for friends' }, settings, undefined, mock)).message, /make time/);
+  assert.equal(primary, 1);
+  assert.equal(google, 2);
+  assert.equal(settings.key, 'server-secret');
+});
+test('credits error is actionable without a configured fallback', async () => {
+  await assert.rejects(runChat(input, config, undefined, async () => new Response('', { status: 402 })), error => error.message === 'PROVIDER_QUOTA');
+});

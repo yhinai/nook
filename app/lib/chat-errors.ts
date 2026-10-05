@@ -1,6 +1,13 @@
 const failures: Record<string, string> = {
+  INVITATION_INVALID: "That invitation code is invalid, expired or already accepted. Ask for a new code.",
+  SELF_CONNECTION: "That is your own invitation code. Ask the other person to create one.",
+  CONNECTION_INACTIVE: "This Twin connection is no longer active. Reconnect before sending a message.",
+  REQUEST_CONFLICT: "This request was already used for different content. Start a new message.",
+  MULTIPLE_RECIPIENTS: "Send to one connected Twin at a time. No message was sent.",
+  ALREADY_RUNNING: "Your Twin is still working on another request. Please wait a moment.",
   RATE_LIMIT: "The AI service is busy. Please try again shortly.",
   PROVIDER_CONFIG: "The AI provider rejected its configuration. Check the server’s API key, model and provider URL.",
+  PROVIDER_QUOTA: "The AI provider has no available credits. Add credits or configure another provider on the server.",
   PROVIDER_ERROR: "The AI provider is temporarily unavailable. Please try again shortly.",
   INVALID_RESPONSE: "The AI provider returned an unreadable reply after retrying. Please try again.",
   RESPONSE_TRUNCATED: "The AI provider could not finish its reply. Please try a shorter request.",
@@ -14,5 +21,5 @@ const failures: Record<string, string> = {
 export function chatFailure(error: unknown, aborted = false) {
   const reason = error instanceof Error ? error.message : "";
   const code = aborted ? "TIMEOUT" : Object.hasOwn(failures, reason) ? reason : "CHAT_FAILED";
-  return { error: aborted ? "Your Twin took too long. Please try again." : failures[code] || "Your Twin could not respond. Please try again.", code, status: code === "RATE_LIMIT" ? 429 : ["AGENT_NOT_CONNECTED", "RECIPIENT_AMBIGUOUS"].includes(code) ? 409 : 502 };
+  return { error: aborted ? "Your Twin took too long. Please try again." : failures[code] || "Your Twin could not respond. Please try again.", code, status: code === "RATE_LIMIT" ? 429 : ["AGENT_NOT_CONNECTED", "RECIPIENT_AMBIGUOUS", "INVITATION_INVALID", "SELF_CONNECTION", "CONNECTION_INACTIVE", "REQUEST_CONFLICT", "MULTIPLE_RECIPIENTS", "ALREADY_RUNNING"].includes(code) ? 409 : 502 };
 }

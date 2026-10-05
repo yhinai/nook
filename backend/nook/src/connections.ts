@@ -31,7 +31,7 @@ export function memberConnection(
 export function connectionView(store: Store, connection: Connection, ownerId: string) {
   const participants = [connection.ownerId, connection.recipientId]
     .filter((participant): participant is string => Boolean(participant))
-    .map((id) => ({ id, displayName: store.owned('user', id, id, userSchema).displayName }))
+    .map((id) => ({ id, displayName: store.owned('user', id, id, userSchema).displayName, isMe: id === ownerId }))
   return {
     id: connection.id,
     revision: connection.revision,

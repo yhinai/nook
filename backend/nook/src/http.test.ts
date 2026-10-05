@@ -80,6 +80,21 @@ test('HTTP authentication, registration gate, owner isolation, CORS, JSON limits
       profile: { name: 'Alex', priority: 'Friends', values: ['Friends'], weekend: true }
     }, a.token)).status, 503)
     const b = await register('Blair')
+    assert.equal((await request('/v1/twins')).status, 401)
+    const directory = await (await request('/v1/twins', undefined, a.token)).json()
+    assert.deepEqual(directory, [{ id: b.user.id, displayName: 'Blair', status: 'available' }])
+    const connect = await request('/v1/connections/requests', { recipientId: b.user.id }, a.token)
+    assert.equal(connect.status, 201)
+    const pending = await connect.json()
+    assert.equal(pending.phase, 'invited')
+    assert.equal((await (await request('/v1/connections/requests', { recipientId: b.user.id }, a.token)).json()).id, pending.id)
+    assert.equal((await request('/v1/connections/respond', { connectionId: pending.id, decision: 'accept' }, a.token)).status, 403)
+    assert.equal((await request('/v1/agent/messages', { connectionId: pending.id, content: 'Hello', requestId: crypto.randomUUID() }, a.token)).status, 409)
+    assert.equal((await (await request('/v1/twins', undefined, b.token)).json())[0].status, 'incoming')
+    assert.equal((await request('/v1/connections/respond', { connectionId: pending.id, decision: 'accept' }, b.token)).status, 200)
+    assert.equal((await (await request('/v1/twins', undefined, a.token)).json())[0].status, 'connected')
+    assert.equal((await request('/v1/agent/messages', { connectionId: pending.id, content: 'Hello', requestId: crypto.randomUUID() }, a.token)).status, 201)
+    assert.equal((await (await request('/v1/agent/messages', undefined, b.token)).json())[0].content, 'Hello')
     const memory = z.object({ id: z.string(), revision: z.number() }).parse(
       await (
         await request(

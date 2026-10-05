@@ -6,8 +6,10 @@ import { runBackendConnections } from "@/lib/nook-backend";
 import { chatFailure } from "@/lib/chat-errors";
 
 const inputSchema = z.discriminatedUnion("action", [
-  z.object({ profile: chatInput.shape.profile, action: z.enum(["list", "invite", "inbox"]) }).strict(),
+  z.object({ profile: chatInput.shape.profile, action: z.enum(["list", "invite", "inbox", "directory"]) }).strict(),
   z.object({ profile: chatInput.shape.profile, action: z.literal("accept"), invitationToken: z.string().regex(/^[A-Za-z0-9_-]{43}$/) }).strict(),
+  z.object({ profile: chatInput.shape.profile, action: z.literal("request"), recipientId: z.string().uuid() }).strict(),
+  z.object({ profile: chatInput.shape.profile, action: z.literal("respond"), connectionId: z.string().uuid(), decision: z.enum(["accept", "decline"]) }).strict(),
   z.object({ profile: chatInput.shape.profile, action: z.literal("send"), connectionId: z.string().uuid(), content: z.string().trim().min(1).max(1000), requestId: z.string().uuid() }).strict(),
 ]);
 const headers = { "Cache-Control": "no-store" };
@@ -30,7 +32,7 @@ export async function POST(request: Request) {
   request.signal.addEventListener("abort", abort, { once: true });
   const timeout = setTimeout(abort, 15000);
   try {
-    return Response.json(await runBackendConnections({ question: "Manage Twin connections", profile: input.profile }, userId, settings, controller.signal, input.action, input.action === "accept" ? input.invitationToken : input.action === "send" ? { connectionId: input.connectionId, content: input.content, requestId: input.requestId } : undefined), { headers });
+    return Response.json(await runBackendConnections({ question: "Manage Twin connections", profile: input.profile }, userId, settings, controller.signal, input.action, input.action === "request" ? { recipientId: input.recipientId } : input.action === "respond" ? { connectionId: input.connectionId, decision: input.decision } : input.action === "accept" ? input.invitationToken : input.action === "send" ? { connectionId: input.connectionId, content: input.content, requestId: input.requestId } : undefined), { headers });
   } catch (error) {
     const failure = chatFailure(error, controller.signal.aborted);
     return Response.json({ error: failure.error, code: failure.code }, { status: failure.status, headers });

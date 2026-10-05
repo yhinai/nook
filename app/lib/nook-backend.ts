@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { liveCouncilSchema, liveChatSchema, connectionViewSchema, agentInboxSchema } from './workspace.ts';
+import { directoryTwinSchema, liveCouncilSchema, liveChatSchema, connectionViewSchema, agentInboxSchema } from './workspace.ts';
 import type { chatInput } from './chat-agent.ts';
 import type { councilInput } from './council-agent.ts';
 
@@ -45,7 +45,7 @@ async function runBackend<T>(schema: z.ZodType<T>, path: string, input: z.infer<
   if (!response.ok) {
     if (response.status === 401) identities.delete(identityKey);
     const upstream = await response.json().catch(() => null) as { error?: { code?: string } } | null;
-    const codes: Record<string, string> = { agent_not_connected: 'AGENT_NOT_CONNECTED', recipient_ambiguous: 'RECIPIENT_AMBIGUOUS', model_unconfigured: 'PROVIDER_CONFIG', grounding_failed: 'GROUNDING_FAILED', invitation_invalid: 'INVITATION_INVALID', self_connection: 'SELF_CONNECTION', connection_inactive: 'CONNECTION_INACTIVE', request_conflict: 'REQUEST_CONFLICT', multiple_recipients: 'MULTIPLE_RECIPIENTS', already_running: 'ALREADY_RUNNING', provider_quota: 'PROVIDER_QUOTA', provider_config: 'PROVIDER_CONFIG', provider_busy: 'RATE_LIMIT', model_invalid_response: 'INVALID_RESPONSE' };
+    const codes: Record<string, string> = { request_recipient_only: 'REQUEST_RECIPIENT_ONLY', agent_not_connected: 'AGENT_NOT_CONNECTED', recipient_ambiguous: 'RECIPIENT_AMBIGUOUS', model_unconfigured: 'PROVIDER_CONFIG', grounding_failed: 'GROUNDING_FAILED', invitation_invalid: 'INVITATION_INVALID', self_connection: 'SELF_CONNECTION', connection_inactive: 'CONNECTION_INACTIVE', request_conflict: 'REQUEST_CONFLICT', multiple_recipients: 'MULTIPLE_RECIPIENTS', already_running: 'ALREADY_RUNNING', provider_quota: 'PROVIDER_QUOTA', provider_config: 'PROVIDER_CONFIG', provider_busy: 'RATE_LIMIT', model_invalid_response: 'INVALID_RESPONSE' };
     throw new Error(response.status === 429 ? 'RATE_LIMIT' : codes[upstream?.error?.code || ''] || 'BACKEND_ERROR');
   }
   return schema.parse(await response.json());
@@ -58,7 +58,9 @@ export async function runBackendChat(input: z.infer<typeof chatInput>, userId: s
   return runBackend(liveChatSchema, '/v1/chat', input, userId, settings, signal, providerFetch);
 }
 
-export async function runBackendConnections(input: z.infer<typeof councilInput>, userId: string, settings: BackendSettings, signal: AbortSignal, action: 'list' | 'invite' | 'accept' | 'inbox' | 'send', payload?: string | { connectionId: string; content: string; requestId: string }, providerFetch: typeof fetch = fetch) {
+export async function runBackendConnections(input: z.infer<typeof councilInput>, userId: string, settings: BackendSettings, signal: AbortSignal, action: 'list' | 'invite' | 'accept' | 'inbox' | 'send' | 'directory' | 'request' | 'respond', payload?: string | Record<string, string>, providerFetch: typeof fetch = fetch) {
+  if (action === 'directory') return runBackend(directoryTwinSchema.array(), '/v1/twins', input, userId, settings, signal, providerFetch, 'GET');
+  if (action === 'request' || action === 'respond') return runBackend(connectionViewSchema, action === 'request' ? '/v1/connections/requests' : '/v1/connections/respond', input, userId, settings, signal, providerFetch, 'POST', payload);
   if (action === 'list') return runBackend(connectionViewSchema.array(), '/v1/connections', input, userId, settings, signal, providerFetch, 'GET');
   if (action === 'inbox') return runBackend(agentInboxSchema, '/v1/agent/messages', input, userId, settings, signal, providerFetch, 'GET');
   if (action === 'send') return runBackend(z.object({ id: z.string().uuid(), status: z.literal('delivered') }), '/v1/agent/messages', input, userId, settings, signal, providerFetch, 'POST', payload);

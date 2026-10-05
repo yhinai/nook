@@ -16,3 +16,12 @@ test('connection client forwards only the explicit message and request ID with c
   };
   assert.equal((await connectionRequest(profile, 'send', { connectionId: requestId, requestId, content: 'Friday works!' }, undefined, mock)).status, 'delivered');
 });
+test('directory validates registered users and requests target an ID rather than a display name', async () => {
+  const id = '11111111-1111-4111-8111-111111111111';
+  assert.deepEqual(await connectionRequest(profile, 'directory', {}, undefined, async () => Response.json([{ id, displayName: 'Maya', status: 'available' }])), [{ id, displayName: 'Maya', status: 'available' }]);
+  await assert.rejects(connectionRequest(profile, 'directory', {}, undefined, async () => Response.json([{ displayName: 'Maya', status: 'available' }])));
+  await connectionRequest(profile, 'request', { recipientId: id }, undefined, async (_url, options) => {
+    assert.deepEqual(JSON.parse(options.body), { profile, action: 'request', recipientId: id });
+    return Response.json({ id, phase: 'invited', participants: [] });
+  });
+});

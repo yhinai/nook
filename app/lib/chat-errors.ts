@@ -1,6 +1,7 @@
 const failures: Record<string, string> = {
   INVITATION_INVALID: "That invitation code is invalid, expired or already accepted. Ask for a new code.",
-  SELF_CONNECTION: "That is your own invitation code. Ask the other person to create one.",
+  REQUEST_RECIPIENT_ONLY: "Only the person who received this connection request can respond.",
+  SELF_CONNECTION: "Choose another person’s Twin or use their invitation code.",
   CONNECTION_INACTIVE: "This Twin connection is no longer active. Reconnect before sending a message.",
   REQUEST_CONFLICT: "This request was already used for different content. Start a new message.",
   MULTIPLE_RECIPIENTS: "Send to one connected Twin at a time. No message was sent.",
@@ -21,5 +22,5 @@ const failures: Record<string, string> = {
 export function chatFailure(error: unknown, aborted = false) {
   const reason = error instanceof Error ? error.message : "";
   const code = aborted ? "TIMEOUT" : Object.hasOwn(failures, reason) ? reason : "CHAT_FAILED";
-  return { error: aborted ? "Your Twin took too long. Please try again." : failures[code] || "Your Twin could not respond. Please try again.", code, status: code === "RATE_LIMIT" ? 429 : ["AGENT_NOT_CONNECTED", "RECIPIENT_AMBIGUOUS", "INVITATION_INVALID", "SELF_CONNECTION", "CONNECTION_INACTIVE", "REQUEST_CONFLICT", "MULTIPLE_RECIPIENTS", "ALREADY_RUNNING"].includes(code) ? 409 : 502 };
+  return { error: aborted ? "Your Twin took too long. Please try again." : failures[code] || "Your Twin could not respond. Please try again.", code, status: code === "RATE_LIMIT" ? 429 : ["REQUEST_RECIPIENT_ONLY", "AGENT_NOT_CONNECTED", "RECIPIENT_AMBIGUOUS", "INVITATION_INVALID", "SELF_CONNECTION", "CONNECTION_INACTIVE", "REQUEST_CONFLICT", "MULTIPLE_RECIPIENTS", "ALREADY_RUNNING"].includes(code) ? 409 : 502 };
 }

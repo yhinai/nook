@@ -4,6 +4,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Network, RefreshCw, Search, Users, MessageCircle } from "lucide-react";
+import { SystemTwins } from "@/components/system-twins";
 import { AgentInbox } from "@/components/agent-inbox";
 import { useTwinConnections } from "@/lib/use-twin-connections";
 import { workspaceSchema, type Profile } from "@/lib/workspace";
@@ -76,6 +77,7 @@ export default function TwinsPage() {
       {!ready ? <p role="status">Opening your Circle…</p> : !profile.name ? <div className="twins-empty"><Network size={32} /><h2>Start with your own Twin.</h2><p>Introduce yourself to Nook to create your Circle.</p><a href="/" className="primary-button">Set up my Twin</a></div> : <>
         {availability === "unavailable" && <p className="twins-notice" role="status">Live Twin connections are unavailable. Your local contacts are shown below; conversations will appear when the connection service is available.</p>}
         {circle.error && <p className="council-error" role="alert">{circle.error}</p>}
+        <SystemTwins twins={circle.directory} available={availability === "available"} loading={circle.loading} error={circle.error} busy={circle.actionBusy} actionError={circle.actionError} refresh={circle.refresh} onAction={circle.actOnTwin} />
         <div className="twins-layout"><section className="twins-map-panel" aria-label="Twin network">
           <div className="twins-controls"><label className="twins-search"><Search size={17} /><input aria-label="Search Twins" placeholder="Find someone in your Circle" value={query} onChange={event => setQuery(event.target.value)} /></label><select aria-label="Filter connections" value={filter} onChange={event => setFilter(event.target.value)}><option value="all">All connections</option><option value="active">Connected</option><option value="invited">Pending</option><option value="local">Local contacts</option><option value="revoked">Disconnected</option></select></div>
           <div ref={graphViewport} className="twins-graph-scroll" tabIndex={0} aria-label="Circular network map. Scroll to explore; select a Twin to see details."><div className="twins-graph" style={{ width: size, height: size }}>

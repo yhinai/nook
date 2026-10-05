@@ -157,3 +157,57 @@ export function disclosedMemories(store: Store, connection: Connection, ownerId:
       return { id, revision, field, dimension, statement, value, confidence }
     })
 }
+
+export const twinRequestInput = z.object({ recipientId: z.string().uuid() }).strict()
+export const twinResponseInput = z.object({ connectionId: z.string().uuid(), decision: z.enum(['accept', 'decline']) }).strict()
+
+// Directory cards expose identity only, never another person's profile or memories.
+export function twinDirectory(store: Store, ownerId: string) {
+  const connections = store.list('connection', connectionSchema).filter(connection =>
+    (connection.ownerId === ownerId || connection.recipientId === ownerId) &&
+    (connection.phase === 'active' || (connection.phase === 'invited' && Date.parse(connection.expiresAt) > Date.now()))
+  )
+  return store.list('user', userSchema).filter(user => user.id !== ownerId).map(user => {
+    const matches = connections.filter(connection => connection.ownerId === user.id || connection.recipientId === user.id)
+    const connection = matches.find(item => item.phase === 'active') || matches.at(-1)
+    return {
+      id: user.id, displayName: user.displayName,
+      status: !connection ? 'available' : connection.phase === 'active' ? 'connected' : connection.recipientId === ownerId ? 'incoming' : 'outgoing',
+      ...(connection ? { connectionId: connection.id } : {})
+    }
+  })
+}
+
+export function requestTwin(store: Store, ownerId: string, input: unknown) {
+  const { recipientId } = twinRequestInput.parse(input)
+  insist(recipientId !== ownerId, 400, 'self_connection', 'Choose another person’s Twin.')
+  store.owned('user', recipientId, recipientId, userSchema)
+  return store.transaction(() => {
+    const existing = store.list('connection', connectionSchema).find(connection =>
+      ((connection.ownerId === ownerId && connection.recipientId === recipientId) ||
+       (connection.ownerId === recipientId && connection.recipientId === ownerId)) &&
+      (connection.phase === 'active' || (connection.phase === 'invited' && Date.parse(connection.expiresAt) > Date.now()))
+    )
+    if (existing) return connectionView(store, existing, ownerId)
+    const connection = store.insert('connection', {
+      ...fresh(ownerId), recipientId, phase: 'invited', tokenHash: '',
+      expiresAt: new Date(Date.now() + 86400000).toISOString(), grants: {}
+    }, connectionSchema)
+    store.audit(ownerId, 'connection.requested', connection.id)
+    store.audit(recipientId, 'connection.request_received', connection.id)
+    return connectionView(store, connection, ownerId)
+  })
+}
+
+export function respondToTwin(store: Store, ownerId: string, input: unknown) {
+  const { connectionId, decision } = twinResponseInput.parse(input)
+  const connection = memberConnection(store, connectionId, ownerId, false)
+  insist(connection.recipientId === ownerId, 403, 'request_recipient_only', 'Only the invited person can respond.')
+  insist(connection.phase === 'invited' && Date.parse(connection.expiresAt) > Date.now(), 409, 'invitation_invalid', 'This connection request has expired or was already answered.')
+  const saved = store.update('connection', {
+    ...connection, phase: decision === 'accept' ? 'active' : 'revoked', tokenHash: '', grants: {}
+  }, connectionSchema)
+  store.audit(ownerId, decision === 'accept' ? 'connection.accepted' : 'connection.declined', saved.id)
+  store.audit(saved.ownerId, decision === 'accept' ? 'connection.accepted' : 'connection.declined', saved.id)
+  return connectionView(store, saved, ownerId)
+}

@@ -2,11 +2,11 @@
 
 import { ArrowUpRight, Check, Clock3, MessageCircle, Plus, Sparkles, Users } from "lucide-react";
 
-import { TwinDirectory } from "@/components/twin-directory";
+import type { ReactNode } from "react";
 import type { AgentMessage } from "@/lib/workspace";
 
 type TwinActivityProps = {
-  onAddTwin: (name: string) => void;
+  directory: ReactNode;
   connectedNames: string[];
   messages: AgentMessage[];
   onOpenInbox: () => void;
@@ -31,7 +31,7 @@ function planUpdate(status: string | undefined) {
   return null;
 }
 
-export function TwinActivity({ onAddTwin, connectedNames, messages, onOpenInbox, friends, plans, onReviewPlan, onAddConnection, onExploreAgent }: TwinActivityProps) {
+export function TwinActivity({ directory, connectedNames, messages, onOpenInbox, friends, plans, onReviewPlan, onAddConnection, onExploreAgent }: TwinActivityProps) {
   const seen = new Set<string>();
   const localFriends = [...friends, ...Object.keys(plans)].filter(name => {
     const key = name.trim().toLowerCase();
@@ -49,7 +49,7 @@ export function TwinActivity({ onAddTwin, connectedNames, messages, onOpenInbox,
     <p className="twin-activity-note"><Sparkles size={14} aria-hidden="true" /><span>Your connections & local plan updates</span></p>
     <button type="button" className="twin-activity-add" onClick={onOpenInbox}><MessageCircle size={15} />Twin inbox{messages.length > 0 ? ` · ${messages.length}` : ""}</button>
     <div className="twin-activity-list">
-      {!localFriends.length && <p className="twin-card-empty">Your circle starts here. Browse the sample Twins below or add someone you know.</p>}
+      {!localFriends.length && <p className="twin-card-empty">Your circle starts here. Browse Twins on Nook below or add someone you know.</p>}
       {localFriends.map(name => {
         const connected = connectedNames.includes(name);
         const status = plans[name];
@@ -67,7 +67,7 @@ export function TwinActivity({ onAddTwin, connectedNames, messages, onOpenInbox,
         </article>;
       })}
     </div>
-    <TwinDirectory compact friends={localFriends} onAdd={onAddTwin} />
+    {directory}
     <button type="button" className="twin-activity-add" onClick={onAddConnection}><Plus size={16} aria-hidden="true" />Add a connection</button>
     <p className="twin-activity-footer">Messages share only what you send. Your private memories stay with you.</p>
   </aside>;

@@ -481,3 +481,11 @@ button.lens-icon { width: 44px; height: 44px; }
 .twin-directory.compact { padding-top: 20px; border-top: 1px solid #e1e7e4; }
 
 .agent-inbox-message p { margin: 12px 0; }
+
+.system-twins-tools { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+.system-twins-tools input { min-width: 0; flex: 1; }
+.system-twin-actions { display: flex; align-items: center; gap: 8px; }
+.system-twin-actions > button { flex: 1; }
+.twins-main > .system-twins { margin-bottom: 24px; }
+.twins-main > .system-twins .twin-directory-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); }
+.system-twins .twin-card-action:disabled { opacity: 1; color: #52675b; }

@@ -21,7 +21,7 @@ import { startDecision } from './decisions.js'
 import { reflectionInput, startReflection } from './reflections.js'
 import { chatInput, startChat } from './chat.js'
 import { inbox, deliverMessage, messageInput, sendAgentMessage } from './agent-messages.js'
-import { invite, accept, grant, revoke, memberConnection, connectionView } from './connections.js'
+import { twinDirectory, requestTwin, respondToTwin, twinRequestInput, twinResponseInput, invite, accept, grant, revoke, memberConnection, connectionView } from './connections.js'
 import {
   createNegotiation,
   readNegotiation,
@@ -159,10 +159,13 @@ export function createRoutes(services: Services): Route[] {
       inbox(store, ownerId)
     ),
     route('POST', '/agent/messages', ({ ownerId, body }) => deliverMessage(store, ownerId, body), messageInput, 201),
+    route('GET', '/twins', ({ ownerId }) => twinDirectory(store, ownerId)),
+    route('POST', '/connections/requests', ({ ownerId, body }) => requestTwin(store, ownerId, body), twinRequestInput, 201),
+    route('POST', '/connections/respond', ({ ownerId, body }) => respondToTwin(store, ownerId, body), twinResponseInput),
     route('GET', '/connections', ({ ownerId }) =>
       store
         .list('connection', contracts.connectionSchema)
-        .filter((value) => value.ownerId === ownerId || value.recipientId === ownerId)
+        .filter((value) => (value.ownerId === ownerId || value.recipientId === ownerId) && (value.phase !== 'invited' || Date.parse(value.expiresAt) > Date.now()))
         .map((value) => connectionView(store, value, ownerId))
     ),
     route(

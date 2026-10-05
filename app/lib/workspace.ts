@@ -22,3 +22,6 @@ export const agentInboxSchema = z.array(z.object({ id: z.string().uuid(), sender
 export type AgentMessage = z.infer<typeof agentInboxSchema>[number];
 
 export const deliveryReceiptSchema = z.object({ id: z.string().uuid(), status: z.literal("delivered") });
+
+export const directoryTwinSchema = z.object({ id: z.string().uuid(), displayName: z.string().min(1).max(100), status: z.enum(["available", "connected", "incoming", "outgoing"]), connectionId: z.string().uuid().optional() });
+export type DirectoryTwin = z.infer<typeof directoryTwinSchema>;

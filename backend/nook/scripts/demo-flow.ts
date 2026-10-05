@@ -28,7 +28,7 @@ export async function runDemo(baseUrl: string, registrationKey?: string, include
         ...(registrationKey ? { 'X-Nook-Registration-Key': registrationKey } : {})
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-      signal: AbortSignal.timeout(20000)
+      signal: AbortSignal.timeout(path === "/v1/chat" ? 150000 : 20000)
     })
     if (!response.ok) {
       throw new Error(`Demo request ${method} ${path} returned HTTP ${response.status}.`)
@@ -122,6 +122,16 @@ export async function runDemo(baseUrl: string, registrationKey?: string, include
   )
   const invitation = connectionResult.parse(await api('/v1/connections/invitations', a.token, {}))
   await api('/v1/connections/accept', b.token, { invitationToken: invitation.invitationToken })
+  const profile = { name: `Demo Alex ${suffix}`, priority: 'Connection', values: ['Friends'], weekend: true }
+  const sent = z.object({ delivery: z.object({ id: z.string(), status: z.literal('delivered') }) }).parse(
+    await api('/v1/chat', a.token, { question: `Invite Demo Blair ${suffix} to a park walk tomorrow`, profile })
+  )
+  const inbox = z.array(z.object({ id: z.string() })).parse(await api('/v1/agent/messages', b.token))
+  if (!inbox.some(item => item.id === sent.delivery.id)) throw new Error('Agent invitation did not reach the connected recipient.')
+  const conversation = z.object({ message: z.string().min(1), researchStatus: z.literal('retrieved'), sources: z.array(z.object({ url: z.string().url() })).min(1) }).parse(
+    await api('/v1/chat', a.token, { question: 'Find public information about Golden Gate Park walking trails in San Francisco. Cite your sources and avoid guessing current hours.', profile, timezone: 'America/Los_Angeles' })
+  )
+  console.log(JSON.stringify({ stage: 'chat', sourcedReply: Boolean(conversation.message), sourceCount: conversation.sources.length, agentInvitationDelivered: true }))
   let connection = connectionResult.parse(await api(`/v1/connections/${invitation.id}`, a.token))
   let memory = memorySchema.parse(await api(`/v1/memories/${extracted[0].id}`, a.token))
   memory = memorySchema.parse(

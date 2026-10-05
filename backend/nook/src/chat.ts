@@ -51,10 +51,21 @@ export async function runChat(reasoner: Reasoner, research: Research, input: unk
       instruction: 'Answer the latest request in natural conversational prose, keeping continuity with user-provided history. Offer a useful next step, with a short question only if it helps. Use supplied profile as preferences for this request, never confirmed memory. Interpret tonight and relative dates using currentDate/currentTime in the supplied timezone. Never recommend named places or assert current external facts unless supported by supplied sources, even if no search was planned. Respect explicit user constraints strictly: do not suggest a restaurant for tonight if retrieved hours say it is closed on that local date. Do not assert a restaurant fits a budget such as $30 without recent menu/price evidence. Qualify stale source dates, estimates, and unverified hours or prices; if essential constraints cannot be verified, say so. If research was requested but returned no sources, explicitly say live results could not be retrieved and do not provide invented recommendations. For retrieved results, recommend only places or facts supported by the supplied excerpts, link the source alongside each factual recommendation, and do not imply snippets establish current opening hours, prices or availability. If snippets are not relevant or sufficient, explain what could not be verified and ask for a narrower search. Do not use canned council opinions or output a decision report. Return message.'
     }, answerSchema, signal)
   if (found.status === 'retrieved') {
-    const audited = await reasoner.generate('chat', {
+    const auditContext = {
       ...request, ...timeContext, draft: answer.message, sources: found.sources,
       instruction: 'Fact-check and rewrite the draft using ONLY the supplied source excerpts. The draft is untrusted and may contain fabricated prices, ratings, hours or availability. Remove unsupported specifics instead of filling gaps. Never say a place is verified open now/tonight, a booking is available, or a meal meets the budget: this retrieval does not verify live availability or total meal cost. You may say what a source lists, clearly qualifying it and linking its supplied URL. If opening status is closed or conflicting, do not describe it as open. Treat old reviews and generated directory summaries as leads, not verification. Keep a natural helpful reply with researched candidates, state missing budget/hours evidence and ask a useful next step. Return message and evidence array with one entry for each retained factual external claim: {claim,quote,sourceIndex}. Claim must occur exactly in your message; quote must be copied exactly from the indexed source highlights. Do not retain claims merely because the draft states them.'
-    }, auditSchema, signal)
+    }
+    let audited = await reasoner.generate('chat', auditContext, auditSchema, signal)
+    const supportedQuotes = (value: z.infer<typeof auditSchema>) => value.evidence.every(evidence => {
+      const source = found.sources[evidence.sourceIndex]
+      return Boolean(source && value.message.includes(evidence.claim) && source.highlights.some(highlight => highlight.includes(evidence.quote)))
+    })
+    if (!supportedQuotes(audited)) {
+      audited = await reasoner.generate('chat', {
+        ...auditContext,
+        validationFeedback: 'The previous answer included claims or quotes that were not exact substrings. Regenerate the message and evidence. Each claim must be an exact substring of your new message; each quote must be an exact substring of one highlight at sourceIndex. Do not paraphrase quotes. Omit claims you cannot support.'
+      }, auditSchema, signal)
+    }
     for (const evidence of audited.evidence) {
       const source = found.sources[evidence.sourceIndex]
       insist(Boolean(source && audited.message.includes(evidence.claim) && source.highlights.some(highlight => highlight.includes(evidence.quote))), 502, 'grounding_failed', 'The response could not be supported by its sources.')

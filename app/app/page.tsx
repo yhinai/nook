@@ -3,7 +3,7 @@
 import { ProfileDetails, Onboarding } from "@/components/onboarding";
 import { TwinActivity } from "@/components/twin-activity";
 import { workspaceSchema, liveChatSchema, profileSchema, connectionViewSchema, type TwinConnection, type Profile } from "@/lib/workspace";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Menu, Sun, Check, ChevronRight, Compass, Heart, Leaf, Plus, ShieldCheck, Sparkles, Users, X, BriefcaseBusiness, Fingerprint, LockKeyhole, SlidersHorizontal, ArrowUp, BookOpen } from "lucide-react";
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 
@@ -123,14 +123,15 @@ export default function Home() {
   }, [busy, dialog, team]);
   useEffect(() => { threadEnd.current?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "end" }); }, [thread, busy, councilError]);
   useEffect(() => { const controller = new AbortController(); fetch("/api/chat", { signal: controller.signal }).then(r => r.ok ? r.json() as Promise<{ available: boolean; requiresSignIn?: boolean; provider?: string; researchAvailable?: boolean; agentsAvailable?: boolean }> : null).then(s => { setAgentsAvailable(Boolean(s?.agentsAvailable)); setAiAvailable(Boolean(s?.available)); setLiveEnabled(Boolean(s?.available)); setAiProvider(s?.provider || "Nook AI"); setResearchAvailable(Boolean(s?.researchAvailable)); setNeedsSignIn(Boolean(s?.requiresSignIn)); }).catch(() => {}); return () => controller.abort(); }, []);
-  async function connectionRequest(action: "list"): Promise<TwinConnection[]>;
-  async function connectionRequest(action: "invite" | "accept", token?: string): Promise<TwinConnection>;
-  async function connectionRequest(action: "list" | "invite" | "accept", token?: string): Promise<TwinConnection | TwinConnection[]> {
+  const connectionRequest = useCallback(async (action: "list" | "invite" | "accept", token?: string): Promise<TwinConnection | TwinConnection[]> => {
     const response = await fetch("/api/connections", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, profile: { name: profile.name, priority: profile.priority, values: profile.values, weekend: profile.weekend, about: profile.about }, ...(token ? { invitationToken: token } : {}) }) });
     const result = await response.json() as { error?: string };
     if (!response.ok) throw new Error(result.error || "Could not connect your Twin.");
     return action === "list" ? connectionViewSchema.array().parse(result) : connectionViewSchema.parse(result);
-  }
+  }, [profile.name, profile.priority, profile.values, profile.weekend, profile.about]) as {
+    (action: "list"): Promise<TwinConnection[]>;
+    (action: "invite" | "accept", token?: string): Promise<TwinConnection>;
+  };
   useEffect(() => {
     if (!ready || !onboardingCompleted || !agentsAvailable) return;
     let cancelled = false;
@@ -140,7 +141,7 @@ export default function Home() {
       setFriends(old => [...new Set([...old, ...names])].slice(0, 100));
     }).catch(() => {});
     return () => { cancelled = true; };
-  }, [ready, onboardingCompleted, agentsAvailable, profile.name]);
+  }, [ready, onboardingCompleted, agentsAvailable, profile.name, connectionRequest]);
   const connectTwin = async (action: "invite" | "accept") => {
     if (connectionBusy) return;
     setConnectionBusy(true);

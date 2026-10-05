@@ -5,6 +5,8 @@ RUN npm ci --ignore-scripts
 COPY backend/nook/src ./src
 COPY src/main/sidequest/provider.ts src/main/sidequest/provider-protocol.ts /app/src/main/sidequest/
 COPY src/main/sidequest/life-team/network.ts /app/src/main/sidequest/life-team/
+COPY src/shared/agent-message.ts /app/src/shared/
+COPY app/lib/agent-message.ts /app/app/lib/
 RUN npm run build
 
 FROM node:24-bookworm-slim

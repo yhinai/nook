@@ -106,3 +106,21 @@ test('researched chat audits the draft instead of returning unverified prices', 
   assert.equal(result.message.includes('$11'), false)
   assert.equal(calls, 3)
 })
+
+test('source audit repairs a paraphrased quote once and rejects persistent unsupported evidence', async () => {
+  for (const repair of [true, false]) {
+    let calls = 0
+    const reasoner: Reasoner = { enabled: true, async generate(_role, context, schema) {
+      calls++
+      if (calls === 1) return schema.parse({ searchQuery: 'vegetarian dinner', clarification: null })
+      if (calls === 2) return schema.parse({ message: 'This menu lists vegetarian dinner.' })
+      if (calls === 4) assert.match((context as { validationFeedback: string }).validationFeedback, /exact substring/)
+      return schema.parse({ message: 'This menu lists vegetarian dinner.', evidence: [{ claim: 'This menu lists vegetarian dinner', quote: repair && calls === 4 ? source.highlights[0] : 'Paraphrased vegetarian dishes', sourceIndex: 0 }] })
+    } }
+    const research: Research = { enabled: true, async search() { throw new Error('Unexpected search') }, async searchQuery() { return { status: 'retrieved', sources: [source] } } }
+    const operation = runChat(reasoner, research, input, new AbortController().signal)
+    if (repair) assert.equal((await operation).message, 'This menu lists vegetarian dinner.')
+    else await assert.rejects(operation, /could not be supported/)
+    assert.equal(calls, 4)
+  }
+})

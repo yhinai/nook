@@ -109,14 +109,28 @@ input::placeholder, textarea::placeholder { color: #818b91; }
 .nook-canvas { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; }
 .nook-idle { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px 24px 100px; text-align: center; }
 .nook-orb { position: relative; width: 170px; height: 170px; flex-shrink: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 26px; background: linear-gradient(140deg, #bad8cf 4%, #83b4a5 48%, #547e70 100%); box-shadow: inset 0 2px 4px #ffffff6e, inset 0 -8px 22px #2c5f3e1a, 0 18px 50px #5f897426, 0 0 0 18px #c5d9d51c, 0 0 0 36px #c5d9d50d; }
-.nook-orb::before { content: ""; position: absolute; inset: 9px; border-radius: 50%; border: 1px solid #ffffff29; }
+.nook-orb::before { content: ""; position: absolute; inset: 9px; border-radius: 50%; border: 1px solid #ffffff29; pointer-events: none; animation: nook-orb-ring 6s ease-in-out infinite; }
+.nook-orb::after { content: ""; position: absolute; inset: -28px; border-radius: 50%; background: radial-gradient(circle, transparent 48%, #96c8b81a 62%, transparent 72%); pointer-events: none; opacity: .5; animation: nook-orb-glow 6s ease-in-out infinite; }
 .nook-orb:hover { transform: scale(1.035); box-shadow: inset 0 2px 4px #ffffff6e, 0 22px 60px #5f897435, 0 0 0 22px #c5d9d521, 0 0 0 44px #c5d9d510; }
 .nook-orb:active { transform: scale(.98); }
-.nook-orb-core { display: grid; grid-template-columns: repeat(2, 17px); gap: 5px; transform: rotate(-8deg); }
+.nook-orb-core { display: grid; grid-template-columns: repeat(2, 17px); gap: 5px; transform: rotate(-8deg); animation: nook-orb-turn 12s cubic-bezier(.45, .12, .55, .88) infinite; will-change: transform; }
 .nook-orb-core i { display: block; width: 17px; height: 17px; border-radius: 13px 4px 13px 4px; background: #ffffffb5; box-shadow: 0 1px 3px #42665314; }
 .nook-orb-core i:nth-child(2) { transform: rotate(90deg); opacity: .65; }
 .nook-orb-core i:nth-child(3) { transform: rotate(-90deg); opacity: .65; }
 .nook-orb-core i:nth-child(4) { transform: rotate(180deg); }
+/* Matching entry/exit velocities keep the variable-speed rotation seamless. */
+@keyframes nook-orb-turn {
+  from { transform: rotate(-8deg); }
+  to { transform: rotate(352deg); }
+}
+@keyframes nook-orb-ring {
+  0%, 100% { transform: scale(1); opacity: .7; }
+  50% { transform: scale(1.025); opacity: 1; }
+}
+@keyframes nook-orb-glow {
+  0%, 100% { transform: scale(.97); opacity: .4; }
+  50% { transform: scale(1.08); opacity: .85; }
+}
 .nook-orb-caption { color: #708078; font-size: 12px; font-weight: 500; margin-bottom: 22px; }
 .nook-idle h1 { font-size: clamp(29px, 3.1vw, 38px); font-weight: 550; letter-spacing: -1.25px; line-height: 1.2; }
 .nook-idle > p { max-width: 350px; color: var(--muted); font-size: 15px; line-height: 1.65; margin-top: 12px; }
@@ -229,6 +243,7 @@ button.nook-mini-orb { width: 44px; height: 44px; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  .nook-orb-core { will-change: auto; }
 }
 
 .nook-conversation { flex: 1; min-height: 0; display: flex; flex-direction: column; }

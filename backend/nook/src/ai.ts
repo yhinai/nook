@@ -34,6 +34,26 @@ export type Reasoner = {
     signal: AbortSignal
   ): Promise<T>
 }
+export function modelOutputSchema<T>(schema: z.ZodType<T>, baseUrl: string) {
+  const jsonSchema = z.toJSONSchema(schema)
+  if (new URL(baseUrl).hostname !== 'generativelanguage.googleapis.com') return jsonSchema
+  // Gemini's constrained decoder rejects otherwise valid schemas with many
+  // length/date constraints. Keep types and numeric bounds on the wire;
+  // server validation below still enforces every original constraint on the result.
+  const decoderConstraints = new Set([
+    '$schema', 'minLength', 'maxLength', 'minItems', 'maxItems', 'pattern', 'format'
+  ])
+  function simplify(value: unknown): unknown {
+    if (Array.isArray(value)) return value.map(simplify)
+    if (value && typeof value === 'object') {
+      return Object.fromEntries(Object.entries(value)
+        .filter(([key]) => !decoderConstraints.has(key))
+        .map(([key, child]) => [key, simplify(child)]))
+    }
+    return value
+  }
+  return simplify(jsonSchema) as typeof jsonSchema
+}
 export function createMastraReasoner(provider: SidequestProvider): Reasoner {
   const model = {
     providerId: 'nook',
@@ -71,14 +91,25 @@ export function createMastraReasoner(provider: SidequestProvider): Reasoner {
       }
       return withinDeadline(
         async (requestSignal) => {
-          const response = await mastra.getAgent(role).generate(JSON.stringify(context), {
-            structuredOutput: { schema: z.toJSONSchema(schema), errorStrategy: 'strict' },
-            abortSignal: requestSignal,
-            maxSteps: 1,
-            modelSettings: { maxOutputTokens: 3000, maxRetries: 0 }
-          })
-          requestSignal.throwIfAborted()
-          return schema.parse(response.object)
+          const gemini = new URL(provider.baseUrl).hostname === 'generativelanguage.googleapis.com'
+          const prompt = gemini
+            ? JSON.stringify({ context, outputContract: z.toJSONSchema(schema), instruction: 'Return JSON satisfying every constraint in outputContract, including numeric ranges, field patterns and length limits.' })
+            : JSON.stringify(context)
+          let correction = ''
+          for (let attempt = 0; attempt < 2; attempt++) {
+            const response = await mastra.getAgent(role).generate(prompt + correction, {
+              structuredOutput: { schema: modelOutputSchema(schema, provider.baseUrl), errorStrategy: 'strict' },
+              abortSignal: requestSignal,
+              maxSteps: 1,
+              modelSettings: { maxOutputTokens: 5000, maxRetries: 0 }
+            })
+            requestSignal.throwIfAborted()
+            const parsed = schema.safeParse(response.object)
+            if (parsed.success) return parsed.data
+            if (!gemini || attempt === 1) throw parsed.error
+            correction = '\nThe previous JSON failed validation. Regenerate it using the original context. Correct these issues: ' + JSON.stringify(parsed.error.issues)
+          }
+          throw new Error('Structured output validation failed.')
         },
         signal,
         45000

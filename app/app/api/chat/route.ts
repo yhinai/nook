@@ -15,7 +15,18 @@ export async function GET(request: Request) {
   catch { return Response.json({ available: false, agentsAvailable: false, requiresSignIn: false, configurationError: true }, { headers }); }
   const configured = available(settings);
   const userId = configured ? await identity(request) : null;
-  return Response.json({ available: configured && Boolean(userId), requiresSignIn: configured && !userId, agentsAvailable: hasBackend(settings) && Boolean(userId), provider: hasBackend(settings) ? "nook" : settings.key ? settings.provider === "google" ? "google" : settings.baseUrl && new URL(settings.baseUrl).hostname !== "api.openai.com" ? "compatible" : "openai" : null, researchAvailable: Boolean(settings.exaKey) }, { headers });
+  let researchAvailable = Boolean(settings.exaKey);
+  if (hasBackend(settings)) {
+    try {
+      const base = new URL(settings.url);
+      if ((base.protocol === 'https:' || (base.protocol === 'http:' && ['127.0.0.1', 'localhost'].includes(base.hostname))) && !base.username && !base.password && !base.search && !base.hash) {
+        const response = await fetch(new URL('/v1/health', base), { signal: AbortSignal.timeout(3000), cache: 'no-store' });
+        const health = response.ok ? await response.json() as { capabilities?: { exa?: boolean } } : null;
+        researchAvailable = health?.capabilities?.exa === true;
+      }
+    } catch { researchAvailable = false; }
+  }
+  return Response.json({ available: configured && Boolean(userId), requiresSignIn: configured && !userId, agentsAvailable: hasBackend(settings) && Boolean(userId), provider: hasBackend(settings) ? "nook" : settings.key ? settings.provider === "google" ? "google" : settings.baseUrl && new URL(settings.baseUrl).hostname !== "api.openai.com" ? "compatible" : "openai" : null, researchAvailable }, { headers });
 }
 export async function POST(request: Request) {
   const origin = request.headers.get("origin");

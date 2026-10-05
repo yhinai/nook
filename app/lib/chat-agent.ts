@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { agentMessageCommand } from "../../src/shared/agent-message.ts";
+import { agentMessageCommand } from "./agent-message.ts";
 import { councilInput, type AgentConfig } from "./council-agent.ts";
 import { chatSourceSchema, liveChatSchema } from "./workspace.ts";
 

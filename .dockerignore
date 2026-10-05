@@ -21,6 +21,14 @@ src/main/sidequest/**
 !src/main/sidequest/life-team/
 src/main/sidequest/life-team/**
 !src/main/sidequest/life-team/network.ts
+!src/shared/
+src/shared/**
+!src/shared/agent-message.ts
+!app/
+app/**
+!app/lib/
+app/lib/**
+!app/lib/agent-message.ts
 **/.env*
 **/node_modules
 **/data

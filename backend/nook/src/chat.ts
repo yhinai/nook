@@ -15,6 +15,7 @@ export const chatInput = reflectionInput.extend({
   }, 'Use a valid IANA timezone.').optional()
 }).strict()
 const planSchema = z.object({
+  locationQuote: z.string().trim().min(1).max(240).nullable().default(null).describe('Exact quote from the user question, user history or profile about that explicitly supplies a city or neighborhood. Null when absent. Never infer a location from the name or timezone.'),
   searchQuery: z.string().trim().min(1).max(1000).nullable(),
   clarification: z.string().trim().min(1).max(1000).nullable()
 }).strict()
@@ -23,6 +24,14 @@ const auditSchema = answerSchema.extend({ evidence: z.array(z.object({ claim: z.
 
 export async function runChat(reasoner: Reasoner, research: Research, input: unknown, signal: AbortSignal) {
   const request = chatInput.parse(input)
+  // The starter prompt has no location. Resolve this essential constraint
+  // before invoking a model or public search; neither may invent the city.
+  const genericDinnerRequest = /^(?:find (?:me )?(?:somewhere|a (?:place|restaurant)) (?:for|to (?:have|eat)) dinner(?: tonight)?|find somewhere for dinner tonight)[.!?]*$/i.test(request.question)
+  const suppliedContext = [request.profile.about, ...(request.history || []).filter(turn => turn.role === 'user').map(turn => turn.content)].filter(Boolean)
+  if (genericDinnerRequest && suppliedContext.length === 0) {
+    signal.throwIfAborted()
+    return { message: 'What city or neighborhood should I look in for dinner tonight?', mode: 'live' as const, sources: [], researchStatus: 'off' as const }
+  }
   const currentTime = new Date()
   const timezone = request.timezone ?? 'UTC'
   const timeContext = {
@@ -39,6 +48,11 @@ export async function runChat(reasoner: Reasoner, research: Research, input: unk
     ...timeContext,
     instruction: 'Plan a conversational reply. For requests needing current public information (restaurants, events, travel, factual research), produce a focused searchQuery using the actual user request and explicit constraints from history. Include the explicitly supplied city/neighborhood, food preferences or timing where relevant. For local recommendations without an explicit location, ask one concise clarification and set searchQuery to null. Ask for other essential missing constraints only when they prevent a useful answer; do not turn this into an intake form. For ordinary conversation, reflection or emotional support, set both fields to null. Never use generic decision-framework search templates. Do not infer personal facts or use assistant suggestions as confirmed user preferences. Return searchQuery and clarification, each string or null.'
   }, planSchema, signal)
+  const userLocationContext = [request.question, ...suppliedContext].join('\n')
+  if (genericDinnerRequest && (!plan.locationQuote || !userLocationContext.includes(plan.locationQuote))) {
+    signal.throwIfAborted()
+    return { message: 'What city or neighborhood should I look in for dinner tonight?', mode: 'live' as const, sources: [], researchStatus: 'off' as const }
+  }
   const found = plan.searchQuery && !plan.clarification
     ? research.searchQuery
       ? await research.searchQuery(plan.searchQuery, signal)

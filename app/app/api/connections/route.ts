@@ -1,7 +1,8 @@
+import { resolveNookIdentity, identityHeaders } from "@/lib/nook-identity";
 import { env } from "cloudflare:workers";
 import { z } from "zod";
 import { getChatGPTUser } from "@/app/chatgpt-auth";
-import { chatConfig, chatInput, localChatIdentity } from "@/lib/chat-agent";
+import { chatConfig, chatInput } from "@/lib/chat-agent";
 import { runBackendConnections } from "@/lib/nook-backend";
 import { chatFailure } from "@/lib/chat-errors";
 
@@ -16,25 +17,25 @@ const headers = { "Cache-Control": "no-store" };
 export async function POST(request: Request) {
   const origin = request.headers.get("origin");
   if (origin && origin !== new URL(request.url).origin) return Response.json({ error: "Use your Nook workspace." }, { status: 403, headers });
+  const session = resolveNookIdentity(request, (await getChatGPTUser())?.userId);
+  const responseHeaders = identityHeaders(session, headers);
   let input;
   try {
     const raw = await request.text();
     if (raw.length > 10000) throw new Error("Too large");
     input = inputSchema.parse(JSON.parse(raw));
-  } catch { return Response.json({ error: "Provide a valid profile and connection request." }, { status: 400, headers }); }
+  } catch { return Response.json({ error: "Provide a valid profile and connection request." }, { status: 400, headers: responseHeaders }); }
   const settings = chatConfig(env as unknown as Record<string, unknown>);
-  if (!settings.url || !settings.registrationKey) return Response.json({ error: "Connect the Nook agent backend to use Twin connections." }, { status: 503, headers });
-  const userId = (await getChatGPTUser())?.userId || localChatIdentity(request, process.env.NODE_ENV !== "production" || settings.allowLocalChat);
-  if (!userId) return Response.json({ error: "Sign in to connect your Twin." }, { status: 401, headers });
+  if (!settings.url || !settings.registrationKey) return Response.json({ error: "Connect the Nook agent backend to use Twin connections." }, { status: 503, headers: responseHeaders });
   const controller = new AbortController();
   const abort = () => controller.abort();
   if (request.signal.aborted) abort();
   request.signal.addEventListener("abort", abort, { once: true });
   const timeout = setTimeout(abort, 15000);
   try {
-    return Response.json(await runBackendConnections({ question: "Manage Twin connections", profile: input.profile }, userId, settings, controller.signal, input.action, input.action === "request" ? { recipientId: input.recipientId } : input.action === "respond" ? { connectionId: input.connectionId, decision: input.decision } : input.action === "accept" ? input.invitationToken : input.action === "send" ? { connectionId: input.connectionId, content: input.content, requestId: input.requestId } : undefined), { headers });
+    return Response.json(await runBackendConnections({ question: "Manage Twin connections", profile: input.profile }, session.userId, settings, controller.signal, input.action, input.action === "request" ? { recipientId: input.recipientId } : input.action === "respond" ? { connectionId: input.connectionId, decision: input.decision } : input.action === "accept" ? input.invitationToken : input.action === "send" ? { connectionId: input.connectionId, content: input.content, requestId: input.requestId } : undefined), { headers: responseHeaders });
   } catch (error) {
     const failure = chatFailure(error, controller.signal.aborted);
-    return Response.json({ error: failure.error, code: failure.code }, { status: failure.status, headers });
+    return Response.json({ error: failure.error, code: failure.code }, { status: failure.status, headers: responseHeaders });
   } finally { clearTimeout(timeout); request.signal.removeEventListener("abort", abort); }
 }

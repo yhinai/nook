@@ -50,7 +50,7 @@ The migrated backend path has been verified with real providers through the loca
 
 ## Backend migration
 
-The frontend registers a separate backend identity per signed-in hosting user and keeps bearer tokens server-side. The adapter caches bearer tokens per process and restores the same backend identity through authenticated session registration after a restart. Submitted profiles are request context only: they are not silently confirmed as long-term memories. Existing backend interviews, confirmed-memory review, connections, negotiations, Kernel tasks, and persistent SQLite data retain their API contracts. The UI circle and persona samples remain local previews.
+Chat, council and Twin connections do not require sign-in. Anonymous visitors receive an unguessable HttpOnly browser cookie (Secure on HTTPS) and a separate backend Twin. Clearing the cookie loses access to that guest Twin. The frontend registers a separate backend identity per visitor or signed-in hosting user and keeps bearer tokens server-side. The adapter caches bearer tokens per process and restores the same backend identity through authenticated session registration after a restart. Submitted profiles are request context only: they are not silently confirmed as long-term memories. Existing backend interviews, confirmed-memory review, connections, negotiations, Kernel tasks, and persistent SQLite data retain their API contracts. The directory shows real registered users; requests require recipient acceptance before messaging.
 
 ## Workflow configuration
 

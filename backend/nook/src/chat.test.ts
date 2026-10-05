@@ -27,7 +27,7 @@ test('chat searches the actual request and history and grounds a conversational 
     assert.deepEqual(data.history, input.history)
     if (calls++ === 0) return schema.parse({ searchQuery: 'Oakland vegetarian dinner under $30 tonight', clarification: null })
     assert.deepEqual(data.sources, [source])
-    return schema.parse({ message: 'This menu includes vegetarian dinner: [menu](https://example.com/menu). Check current prices and hours before going.', ...(calls > 2 ? {evidence: [{claim: 'This menu includes vegetarian dinner', quote: 'Vegetarian dinner menu in Oakland.', sourceIndex: 0}]} : {}) })
+    return schema.parse({ message: 'This menu includes vegetarian dinner: [menu](https://example.com/menu). Check current prices and hours before going.', ...(calls > 2 ? {evidence: [{claim: 'This menu includes vegetarian dinner', highlightIndex: 0, sourceIndex: 0}]} : {}) })
   } }
   const result = await runChat(reasoner, research, input, new AbortController().signal)
   assert.equal(calls, 3)
@@ -99,7 +99,7 @@ test('researched chat audits the draft instead of returning unverified prices', 
     if (calls++ === 0) return schema.parse({ searchQuery: 'Oakland vegetarian dinner', clarification: null })
     if (calls === 2) return schema.parse({ message: 'A meal costs $11 and it is verified open tonight.' })
     assert.equal((context as {draft: string}).draft, 'A meal costs $11 and it is verified open tonight.')
-    return schema.parse({message: 'This vegetarian menu is a candidate, but I could not verify the total cost or tonight’s availability. [Menu](https://example.com/menu)', evidence: [{claim: 'This vegetarian menu', quote: 'Vegetarian dinner menu in Oakland.', sourceIndex: 0}]})
+    return schema.parse({message: 'This vegetarian menu is a candidate, but I could not verify the total cost or tonight’s availability. [Menu](https://example.com/menu)', evidence: [{claim: 'This vegetarian menu', highlightIndex: 0, sourceIndex: 0}]})
   } }
   const research: Research = { enabled: true, async search() { throw new Error('Unexpected category search') }, async searchQuery() { return {status: 'retrieved', sources: [source]} } }
   const result = await runChat(reasoner, research, input, new AbortController().signal)
@@ -107,7 +107,7 @@ test('researched chat audits the draft instead of returning unverified prices', 
   assert.equal(calls, 3)
 })
 
-test('source audit repairs a paraphrased quote once and rejects persistent unsupported evidence', async () => {
+test('source audit repairs an invalid highlight index once and rejects persistent unsupported evidence', async () => {
   for (const repair of [true, false]) {
     let calls = 0
     const reasoner: Reasoner = { enabled: true, async generate(_role, context, schema) {
@@ -115,7 +115,7 @@ test('source audit repairs a paraphrased quote once and rejects persistent unsup
       if (calls === 1) return schema.parse({ searchQuery: 'vegetarian dinner', clarification: null })
       if (calls === 2) return schema.parse({ message: 'This menu lists vegetarian dinner.' })
       if (calls === 4) assert.match((context as { validationFeedback: string }).validationFeedback, /exact substring/)
-      return schema.parse({ message: 'This menu lists vegetarian dinner.', evidence: [{ claim: 'This menu lists vegetarian dinner', quote: repair && calls === 4 ? source.highlights[0] : 'Paraphrased vegetarian dishes', sourceIndex: 0 }] })
+      return schema.parse({ message: 'This menu lists vegetarian dinner.', evidence: [{ claim: 'This menu lists vegetarian dinner', highlightIndex: repair && calls === 4 ? 0 : 5, sourceIndex: 0 }] })
     } }
     const research: Research = { enabled: true, async search() { throw new Error('Unexpected search') }, async searchQuery() { return { status: 'retrieved', sources: [source] } } }
     const operation = runChat(reasoner, research, input, new AbortController().signal)

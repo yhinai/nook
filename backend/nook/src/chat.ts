@@ -17,7 +17,7 @@ const planSchema = z.object({
   clarification: z.string().trim().min(1).max(1000).nullable()
 }).strict()
 const answerSchema = z.object({ message: z.string().trim().min(1).max(6000) }).strict()
-const auditSchema = answerSchema.extend({ evidence: z.array(z.object({ claim: z.string().min(1).max(2000), quote: z.string().min(1).max(3000), sourceIndex: z.number().int().min(0).max(5) }).strict()).max(20) }).strict()
+const auditSchema = answerSchema.extend({ evidence: z.array(z.object({ claim: z.string().min(1).max(2000), highlightIndex: z.number().int().min(0).max(20), sourceIndex: z.number().int().min(0).max(5) }).strict()).max(20) }).strict()
 
 export async function runChat(reasoner: Reasoner, research: Research, input: unknown, signal: AbortSignal) {
   const request = chatInput.parse(input)
@@ -53,26 +53,26 @@ export async function runChat(reasoner: Reasoner, research: Research, input: unk
   if (found.status === 'retrieved') {
     const auditContext = {
       ...request, ...timeContext, draft: answer.message, sources: found.sources,
-      instruction: 'Fact-check and rewrite the draft using ONLY the supplied source excerpts. The draft is untrusted and may contain fabricated prices, ratings, hours or availability. Remove unsupported specifics instead of filling gaps. Never say a place is verified open now/tonight, a booking is available, or a meal meets the budget: this retrieval does not verify live availability or total meal cost. You may say what a source lists, clearly qualifying it and linking its supplied URL. If opening status is closed or conflicting, do not describe it as open. Treat old reviews and generated directory summaries as leads, not verification. Keep a natural helpful reply with researched candidates, state missing budget/hours evidence and ask a useful next step. Return message and evidence array with one entry for each retained factual external claim: {claim,quote,sourceIndex}. Claim must occur exactly in your message; quote must be copied exactly from the indexed source highlights. Do not retain claims merely because the draft states them.'
+      instruction: 'Fact-check and rewrite the draft using ONLY the supplied source excerpts. The draft is untrusted and may contain fabricated prices, ratings, hours or availability. Remove unsupported specifics instead of filling gaps. Never say a place is verified open now/tonight, a booking is available, or a meal meets the budget: this retrieval does not verify live availability or total meal cost. You may say what a source lists, clearly qualifying it and linking its supplied URL. If opening status is closed or conflicting, do not describe it as open. Treat old reviews and generated directory summaries as leads, not verification. Keep a natural helpful reply with researched candidates, state missing budget/hours evidence and ask a useful next step. Return message and evidence array with one entry for each retained factual external claim: {claim,sourceIndex,highlightIndex}. Claim must occur exactly in your message. Select zero-based sourceIndex and highlightIndex pointing to the existing highlight that supports it. Do not create or paraphrase quotes. Do not retain claims merely because the draft states them.'
     }
     let audited = await reasoner.generate('chat', auditContext, auditSchema, signal)
     const supportedQuotes = (value: z.infer<typeof auditSchema>) => value.evidence.every(evidence => {
       const source = found.sources[evidence.sourceIndex]
-      return Boolean(source && value.message.includes(evidence.claim) && source.highlights.some(highlight => highlight.includes(evidence.quote)))
+      return Boolean(source && value.message.includes(evidence.claim) && typeof source.highlights[evidence.highlightIndex] === 'string')
     })
     if (!supportedQuotes(audited)) {
       audited = await reasoner.generate('chat', {
         ...auditContext,
-        validationFeedback: 'The previous answer included claims or quotes that were not exact substrings. Regenerate the message and evidence. Each claim must be an exact substring of your new message; each quote must be an exact substring of one highlight at sourceIndex. Do not paraphrase quotes. Omit claims you cannot support.'
+        validationFeedback: 'The previous answer included an invalid highlight reference or a claim absent from the message. Regenerate the message and evidence. Each claim must be an exact substring of your new message. Select existing zero-based sourceIndex and highlightIndex values. Omit claims you cannot support.'
       }, auditSchema, signal)
     }
     for (const evidence of audited.evidence) {
       const source = found.sources[evidence.sourceIndex]
-      insist(Boolean(source && audited.message.includes(evidence.claim) && source.highlights.some(highlight => highlight.includes(evidence.quote))), 502, 'grounding_failed', 'The response could not be supported by its sources.')
+      insist(Boolean(source && audited.message.includes(evidence.claim) && typeof source.highlights[evidence.highlightIndex] === 'string'), 502, 'grounding_failed', 'The response could not be supported by its sources.')
     }
     const userText = [request.question, ...(request.history || []).filter(item => item.role === 'user').map(item => item.content)].join(' ')
     for (const price of audited.message.match(/(?:\$|€|£)\s*\d+(?:[.,]\d+)?/g) || []) {
-      insist(userText.includes(price) || audited.evidence.some(item => item.claim.includes(price) && item.quote.includes(price)), 502, 'grounding_failed', 'A price could not be supported by its sources.')
+      insist(userText.includes(price) || audited.evidence.some(item => item.claim.includes(price) && found.sources[item.sourceIndex]?.highlights[item.highlightIndex]?.includes(price)), 502, 'grounding_failed', 'A price could not be supported by its sources.')
     }
     answer = { message: audited.message }
   }

@@ -15,6 +15,10 @@ const auditSchema = answerSchema.extend({ evidence: z.array(z.object({ claim: z.
 // Binding values (including an explicit empty value) override process variables.
 export function chatConfig(bindings: Record<string, unknown> = {}, processValues: Record<string, string | undefined> = process.env) {
   const read = (name: string) => typeof bindings[name] === "string" ? bindings[name] as string : processValues[name] || "";
+  const registrationKey = read("NOOK_REGISTRATION_KEY").trim();
+  // This app ships with a deployed Twin service. A configured registration key
+  // enables it even when the optional URL override was omitted.
+  const backendUrl = read("NOOK_API_URL").trim() || (registrationKey ? "https://nook-alhinai-api.fly.dev" : "");
   const genericKey = read("AI_API_KEY");
   const routerKey = read("OPENROUTER_API_KEY");
   const compatibleKey = genericKey || routerKey;
@@ -29,8 +33,8 @@ export function chatConfig(bindings: Record<string, unknown> = {}, processValues
     exaKey: read("EXA_API_KEY"),
     auditKey: provider !== "google" ? googleKey : "",
     auditModel: read("GOOGLE_MODEL") || "gemini-2.5-flash",
-    url: read("NOOK_API_URL"),
-    registrationKey: read("NOOK_REGISTRATION_KEY"),
+    url: backendUrl,
+    registrationKey,
     allowLocalChat: read("NOOK_ALLOW_LOCAL_CHAT") === "true",
   };
 }

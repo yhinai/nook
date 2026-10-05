@@ -12,6 +12,16 @@ test('binding values override process values and generic, OpenRouter, Google and
   assert.equal(chatConfig({ OPENROUTER_API_KEY: 'router' }, {}).baseUrl, 'https://openrouter.ai/api/v1');
   assert.equal(chatConfig({ AI_API_KEY: '' }, { AI_API_KEY: 'process' }).key, '');
 });
+test('Twin backend defaults when a registration key is present and preserves URL overrides', () => {
+  for (const url of [undefined, '', '   ']) {
+    const settings = chatConfig({ NOOK_REGISTRATION_KEY: 'server-registration', ...(url === undefined ? {} : { NOOK_API_URL: url }) }, {});
+    assert.equal(settings.url, 'https://nook-alhinai-api.fly.dev');
+    assert.equal(settings.registrationKey, 'server-registration');
+  }
+  assert.equal(chatConfig({ NOOK_REGISTRATION_KEY: 'server-registration', NOOK_API_URL: 'http://127.0.0.1:8788' }, {}).url, 'http://127.0.0.1:8788');
+  assert.equal(chatConfig({}, {}).url, '');
+  assert.equal(chatConfig({ NOOK_REGISTRATION_KEY: '' }, { NOOK_REGISTRATION_KEY: 'process-key' }).url, '');
+});
 test('development identity rejects external forwarding and production but allows local proxy', () => {
   assert.equal(localChatIdentity(new Request('http://localhost:3000/api/chat'), true), 'local-development');
   assert.equal(localChatIdentity(new Request('http://localhost:3000/api/chat', { headers: { 'x-forwarded-host': 'localhost:3000', 'x-forwarded-for': '::1' } }), true), 'local-development');

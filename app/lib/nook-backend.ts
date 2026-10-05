@@ -45,7 +45,7 @@ async function runBackend<T>(schema: z.ZodType<T>, path: string, input: z.infer<
   if (!response.ok) {
     if (response.status === 401) identities.delete(identityKey);
     const upstream = await response.json().catch(() => null) as { error?: { code?: string } } | null;
-    const codes: Record<string, string> = { agent_not_connected: 'AGENT_NOT_CONNECTED', recipient_ambiguous: 'RECIPIENT_AMBIGUOUS', model_unconfigured: 'PROVIDER_CONFIG', grounding_failed: 'GROUNDING_FAILED', invitation_invalid: 'INVITATION_INVALID', self_connection: 'SELF_CONNECTION', connection_inactive: 'CONNECTION_INACTIVE', request_conflict: 'REQUEST_CONFLICT', multiple_recipients: 'MULTIPLE_RECIPIENTS', already_running: 'ALREADY_RUNNING' };
+    const codes: Record<string, string> = { agent_not_connected: 'AGENT_NOT_CONNECTED', recipient_ambiguous: 'RECIPIENT_AMBIGUOUS', model_unconfigured: 'PROVIDER_CONFIG', grounding_failed: 'GROUNDING_FAILED', invitation_invalid: 'INVITATION_INVALID', self_connection: 'SELF_CONNECTION', connection_inactive: 'CONNECTION_INACTIVE', request_conflict: 'REQUEST_CONFLICT', multiple_recipients: 'MULTIPLE_RECIPIENTS', already_running: 'ALREADY_RUNNING', provider_quota: 'PROVIDER_QUOTA', provider_config: 'PROVIDER_CONFIG', provider_busy: 'RATE_LIMIT', model_invalid_response: 'INVALID_RESPONSE' };
     throw new Error(response.status === 429 ? 'RATE_LIMIT' : codes[upstream?.error?.code || ''] || 'BACKEND_ERROR');
   }
   return schema.parse(await response.json());

@@ -124,3 +124,23 @@ test('source audit repairs an absent claim once and rejects persistent unsupport
     assert.equal(calls, 4)
   }
 })
+test('client cancellation aborts active model work and releases the user job', async () => {
+  const jobs = new Jobs()
+  const controller = new AbortController()
+  let modelAborted = false
+  const reasoner: Reasoner = {
+    enabled: true,
+    async generate(_role, _context, _schema, signal) {
+      return new Promise((_resolve, reject) => {
+        signal.addEventListener('abort', () => { modelAborted = true; reject(new DOMException('Cancelled', 'AbortError')) }, { once: true })
+      })
+    }
+  }
+  const pending = startChat(jobs, reasoner, { enabled: false, search: async () => ({ status: 'off', sources: [] }) }, 'cancelled-client', input, controller.signal)
+  await new Promise(resolve => setImmediate(resolve))
+  controller.abort()
+  await assert.rejects(pending, error => error instanceof Error && error.name === 'AbortError')
+  await jobs.settle()
+  assert.equal(modelAborted, true)
+  assert.doesNotThrow(() => jobs.requireAvailable('cancelled-client'))
+})

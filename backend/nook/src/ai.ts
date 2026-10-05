@@ -113,7 +113,21 @@ export function createMastraReasoner(provider: SidequestProvider): Reasoner {
         },
         signal,
         45000
-      )
+      ).catch((error: unknown) => {
+        if (signal.aborted || error instanceof ApiError) throw error
+        if (error instanceof z.ZodError) throw new ApiError(502, 'model_invalid_response', 'The AI provider returned invalid structured output.')
+        let candidate = error
+        for (let depth = 0; depth < 4; depth++) {
+          if (!candidate || typeof candidate !== 'object') break
+          const details = candidate as { statusCode?: unknown; status?: unknown; cause?: unknown }
+          const status = details.statusCode ?? details.status
+          if (status === 402) throw new ApiError(503, 'provider_quota', 'The AI provider has no available credits.')
+          if (status === 429) throw new ApiError(429, 'provider_busy', 'The AI provider is busy.')
+          if ([400, 401, 403, 404].includes(Number(status))) throw new ApiError(503, 'provider_config', 'The AI provider rejected the server configuration.')
+          candidate = details.cause
+        }
+        throw error
+      })
     }
   }
 }

@@ -55,3 +55,9 @@ The frontend registers a separate backend identity per signed-in hosting user an
 ## Workflow configuration
 
 Run `npm run workflows:status` to check server credential presence without printing secrets. `lib/workflow-config.ts` reads optional Exa, Kernel, Fly and registration credentials. Presence checks do not verify connectivity or perform external actions. Keep local secrets in ignored `.dev.vars`; hosted secrets must be configured separately.
+
+## Conversation reliability
+
+When the configured compatible provider reports exhausted credits, throttling or an outage, chat can use the configured Google key as a fallback. Credentials errors remain actionable errors. Delivery requests carry stable IDs so a network retry cannot duplicate a Twin message. Circle shows active connection status, incoming messages and explicit replies; local contact names are labelled separately. Backend chat cancels active model work when its HTTP client disconnects.
+
+For isolated browser verification, run `backend/nook/scripts/verify-twin-ui.ts` with `NOOK_VERIFY_DIRECTORY` pointing at a temporary directory. It uses an in-memory database, synthetic Maya account and fixture replies on loopback port 8879; it never contacts a real person or AI provider.

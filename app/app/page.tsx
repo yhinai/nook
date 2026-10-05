@@ -4,7 +4,7 @@ import { ProfileDetails, Onboarding } from "@/components/onboarding";
 import { AgentInbox } from "@/components/agent-inbox";
 import { useTwinConnections } from "@/lib/use-twin-connections";
 import { connectionRequest } from "@/lib/connection-client";
-import { agentMessageCommand } from "../../src/shared/agent-message";
+import { agentMessageCommand } from "@/lib/agent-message";
 import { TwinDirectory } from "@/components/twin-directory";
 import { addCircleName } from "@/lib/twin-directory";
 import { TwinActivity } from "@/components/twin-activity";

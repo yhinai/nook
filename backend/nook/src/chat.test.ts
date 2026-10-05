@@ -144,3 +144,26 @@ test('client cancellation aborts active model work and releases the user job', a
   assert.equal(modelAborted, true)
   assert.doesNotThrow(() => jobs.requireAvailable('cancelled-client'))
 })
+
+
+test('dinner starter asks for a location without model or research calls', async () => {
+  const reasoner: Reasoner = { enabled: true, async generate() { throw new Error('Must ask for location before AI') } }
+  const research: Research = { enabled: true, async search() { throw new Error('Unexpected search') }, async searchQuery() { throw new Error('Unexpected search') } }
+  const result = await runChat(reasoner, research, { ...input, question: 'Find somewhere for dinner tonight.', history: [] }, new AbortController().signal)
+  assert.match(result.message, /city or neighborhood/)
+  assert.equal(result.researchStatus, 'off')
+  assert.deepEqual(result.sources, [])
+})
+
+
+test('unrelated profile details do not permit a guessed dinner location', async () => {
+  let calls = 0
+  const reasoner: Reasoner = { enabled: true, async generate(_role, _context, schema) {
+    calls++
+    return schema.parse({ searchQuery: 'restaurants in a guessed city', clarification: null, locationQuote: null })
+  } }
+  const research: Research = { enabled: true, async search() { throw new Error('Unexpected search') }, async searchQuery() { throw new Error('Unexpected search') } }
+  const result = await runChat(reasoner, research, { ...input, question: 'Find somewhere for dinner tonight.', history: [], profile: { ...input.profile, about: 'I enjoy learning and meeting friends.' } }, new AbortController().signal)
+  assert.match(result.message, /city or neighborhood/)
+  assert.equal(calls, 1)
+})

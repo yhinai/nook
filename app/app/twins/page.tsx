@@ -4,6 +4,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Network, RefreshCw, Search, Users, MessageCircle } from "lucide-react";
+import { matchesUserName } from "@/lib/user-search";
 import { SystemTwins } from "@/components/system-twins";
 import { AgentInbox } from "@/components/agent-inbox";
 import { useTwinConnections } from "@/lib/use-twin-connections";
@@ -53,7 +54,7 @@ export default function TwinsPage() {
   const connectedNodes: MapNode[] = circle.connections.flatMap(connection => connection.participants.filter(person => !person.isMe).map(person => ({ id: `${connection.id}:${person.id}`, name: person.displayName, phase: connection.phase, connectionId: connection.id })));
   const connectedNames = new Set(connectedNodes.map(node => node.name));
   const nodes: MapNode[] = [...connectedNodes, ...localFriends.filter(name => !connectedNames.has(name)).map(name => ({ id: `local:${name}`, name, phase: "local" as const }))];
-  const visibleNodes = nodes.filter(node => node.name.toLowerCase().includes(query.trim().toLowerCase()) && (filter === "all" || node.phase === filter));
+  const visibleNodes = nodes.filter(node => matchesUserName(node.name, query) && (filter === "all" || node.phase === filter));
   const selected = nodes.find(node => node.id === selectedId);
   const selectedConnection = circle.connections.find(connection => connection.id === selected?.connectionId);
   const selectedMessages = circle.messages.filter(message => message.connectionId === selected?.connectionId);

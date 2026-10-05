@@ -503,3 +503,13 @@ button.lens-icon { width: 44px; height: 44px; }
 .location-dismiss { flex-shrink: 0; }
 .composer-meta { flex-wrap: wrap; gap: 8px; }
 @media (max-width: 600px) { .location-permission { margin: 12px 14px 0; padding: 14px; }.location-settings { margin: 20px 0; } }
+
+.user-search-field { display: flex; align-items: center; gap: 9px; min-width: 0; flex: 1; padding-left: 13px; border: 1px solid #dce2e3; border-radius: 12px; background: #fff; color: #62786d; }
+.user-search-field input[type="search"] { border: 0; min-width: 0; background: transparent; padding-left: 0; }
+.user-search-field input::-webkit-search-cancel-button { -webkit-appearance: none; }
+.user-search-filters { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+.user-search-filters button { padding: 8px 11px; min-height: 40px; border: 1px solid #dfe7e1; border-radius: 10px; font-size: 12px; color: #566b5f; }
+.user-search-filters button[aria-pressed="true"] { background: #e4eee7; border-color: #a9c5b4; color: #345b46; }
+.user-search-count { margin-top: 12px; font-size: 12px; color: #627569; overflow-wrap: anywhere; }
+.nook-mobile-search { display: none; }
+@media (max-width: 600px) { .nook-mobile-search { display: flex; margin-left: auto; min-width: 44px; min-height: 44px; } }

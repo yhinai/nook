@@ -107,7 +107,7 @@ test('researched chat audits the draft instead of returning unverified prices', 
   assert.equal(calls, 3)
 })
 
-test('source audit repairs an invalid highlight index once and rejects persistent unsupported evidence', async () => {
+test('source audit repairs an absent claim once and rejects persistent unsupported evidence', async () => {
   for (const repair of [true, false]) {
     let calls = 0
     const reasoner: Reasoner = { enabled: true, async generate(_role, context, schema) {
@@ -115,7 +115,7 @@ test('source audit repairs an invalid highlight index once and rejects persisten
       if (calls === 1) return schema.parse({ searchQuery: 'vegetarian dinner', clarification: null })
       if (calls === 2) return schema.parse({ message: 'This menu lists vegetarian dinner.' })
       if (calls === 4) assert.match((context as { validationFeedback: string }).validationFeedback, /exact substring/)
-      return schema.parse({ message: 'This menu lists vegetarian dinner.', evidence: [{ claim: 'This menu lists vegetarian dinner', highlightIndex: repair && calls === 4 ? 0 : 5, sourceIndex: 0 }] })
+      return schema.parse({ message: 'This menu lists vegetarian dinner.', evidence: [{ claim: repair && calls === 4 ? 'This menu lists vegetarian dinner' : 'An absent claim', highlightIndex: 0, sourceIndex: 0 }] })
     } }
     const research: Research = { enabled: true, async search() { throw new Error('Unexpected search') }, async searchQuery() { return { status: 'retrieved', sources: [source] } } }
     const operation = runChat(reasoner, research, input, new AbortController().signal)
